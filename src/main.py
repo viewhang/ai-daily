@@ -138,7 +138,10 @@ async def run_fetch_job(config: Dict):
     print(f"{'=' * 50}")
 
     interval = config["schedule"]["fetch_interval_minutes"]
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=interval)
+    lookback = config["schedule"].get("fetch_lookback_minutes", 120)
+    lookback = max(lookback, interval)
+    threshold = lookback + interval
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback)
 
     sources = merge_sources(config["sources"])
     print(f"📂 共 {len(sources)} 个订阅源")
@@ -163,11 +166,11 @@ async def run_fetch_job(config: Dict):
         )
 
     fetch_file = get_fetch_file()
-    existing_links = load_existing_links(fetch_file)
+    existing_links = load_existing_links(fetch_file, threshold)
     new_entries = [
         e for e in entries if e.get("link") and e["link"] not in existing_links
     ]
-    print(f"🆕 新消息 {len(new_entries)} 条")
+    print(f"🆕 新消息 {len(new_entries)} 条 | 链接数：{len(existing_links)}")
 
     if not new_entries:
         return

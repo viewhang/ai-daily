@@ -116,6 +116,7 @@ python -m src.main
     // 调度配置
     "schedule": {
         "fetch_interval_minutes": 30,  // RSS抓取间隔（分钟）
+        "fetch_lookback_minutes": 120,  // RSS冗余缓存时间（分钟），必须大于fetch_interval_minutes，用于防止RSS延迟导致漏读
         "push_cron": ["0 8 * * *", "0 17 * * *"],  // 定时推送cron表达式
         "timezone_hours": 8  // 时区偏移（8=北京时间）
     },
@@ -171,9 +172,9 @@ python -m src.main
 |------|------|------|
 | `min_score` | number | 最低评分阈值，低于此分数的内容不参与推送（默认60） |
 | `hot_threshold` | number | 热点阈值，达到此分数立即触发即时推送（默认90） |
-| `context_days` | number | 上下文天数，汇总推送时参考的历史天数（默认3天） |
+| `context_days` | number | 上下文天数，汇总推送时参考的fetch数据历史天数（默认3天） |
 | `keep_days` | number | 数据保留天数，超过天数的 JSON 文件会被清理 |
-| `push_context_days` | number | 汇总推送去重的上下文有效天数（默认5天） |
+| `push_context_days` | number | 汇总推送去重的历史push文件有效天数（默认5天） |
 | `no_content_marker` | string | LLM 返回的无内容标记，当推送内容包含此字符串时跳过推送（默认"[NO_NEW_CONTENT]"） |
 
 ### schedule —— 调度配置
@@ -181,6 +182,7 @@ python -m src.main
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `fetch_interval_minutes` | number | RSS 抓取间隔，单位分钟（默认30分钟） |
+| `fetch_lookback_minutes` | number | RSS 冗余缓存时间（分钟），必须大于 `fetch_interval_minutes`，用于防止 RSS 延迟导致漏读（默认120分钟） |
 | `push_cron` | array | 定时推送的 cron 表达式数组，支持多个时间点 |
 | `timezone_hours` | number | 时区偏移小时数，用于时间显示（8 = UTC+8 北京时间） |
 

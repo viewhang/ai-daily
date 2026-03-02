@@ -1,4 +1,45 @@
 {
+    "filter": {
+        "min_score": 60,
+        "hot_threshold": 90,
+        "context_days": 2,
+        "keep_days": 7,
+        "push_context_days": 5,
+        "no_content_marker": "[NO_NEW_CONTENT]"
+    },
+    "schedule": {
+        "fetch_interval_minutes": 30,
+        "fetch_lookback_minutes": 120,
+        "push_cron": ["0 8 * * *", "0 17 * * *"],
+        "timezone_hours": 8
+    },
+    "fetch": {
+        "max_workers": 10,
+        "timeout": 10
+    },
+    "llm": {
+        "provider": "openai",
+        "model": "x-ai/grok-4.1-fast",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "apiKeyName": "OPENROUTER_API_KEY",
+        "max_prompt_chars": 128000,
+        "max_concurrent_batches": 3,
+        "prompts": {
+            "score_batch": "prompts/score_batch.md",
+            "immediate_push": "prompts/immediate_push.md",
+            "digest": "prompts/digest.md"
+        }
+    },
+    "push": {
+        "discord": {
+            "enabled": true,
+            "apiKeyName": "DISCORD_WEBHOOK_URL"
+        },
+        "wecom": {
+            "enabled": false,
+            "apiKeyName": "WECOM_KEY"
+        }
+    },
     "sources": {
         "base_opml": "resources/rss.opml",
         "add": [
@@ -28,45 +69,5 @@
             }
         ],
         "block_domains": ["*.substack.com", "*.youtube.com"]
-    },
-    "filter": {
-        "min_score": 60,
-        "hot_threshold": 90,
-        "context_days": 2,
-        "keep_days": 7,
-        "push_context_days": 5,
-        "no_content_marker": "[NO_NEW_CONTENT]"
-    },
-    "schedule": {
-        "fetch_interval_minutes": 30,
-        "push_cron": ["0 8 * * *", "0 17 * * *", "49 21 * * *"],
-        "timezone_hours": 8
-    },
-    "fetch": {
-        "max_workers": 10,
-        "timeout": 10
-    },
-    "llm": {
-        "provider": "openai",
-        "model": "x-ai/grok-4.1-fast",
-        "baseUrl": "https://openrouter.ai/api/v1",
-        "apiKeyName": "OPENROUTER_API_KEY",
-        "max_prompt_chars": 128000,
-        "max_concurrent_batches": 3,
-        "prompts": {
-            "score_batch": "prompts/score_batch.md",
-            "immediate_push": "prompts/immediate_push.md",
-            "digest": "prompts/digest.md"
-        }
-    },
-    "push": {
-        "discord": {
-            "enabled": true,
-            "apiKeyName": "DISCORD_WEBHOOK_URL"
-        },
-        "wecom": {
-            "enabled": false,
-            "apiKeyName": "WECOM_KEY"
-        }
     }
 }

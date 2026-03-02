@@ -301,22 +301,42 @@ totalEntries: {total_entries}
         f.write(frontmatter + content)
 
 
-def load_existing_links(filepath: str) -> set:
-    """加载文件中已有的链接（用于去重）"""
-    if not filepath or not Path(filepath).exists():
-        return set()
+def load_existing_links(filepath: str, threshold: int = 150) -> set:
+    """加载文件中已有的链接（用于去重）
 
-    # 检查是JSON还是旧版Markdown
-    if filepath.endswith(".json"):
+    如果当天时间已超过 threshold 分钟，则只需加载当天文件；
+    否则需要同时加载当天和昨天的文件（用于处理跨天边界情况）。
+
+    Args:
+        filepath: 当天的 fetch 文件路径
+        threshold: 阈值（分钟），超过此时间只加载当天文件
+    """
+    tz = get_timezone()
+    now = datetime.now(tz)
+    current_minutes = now.hour * 60 + now.minute
+
+    need_yesterday = current_minutes < threshold
+
+    if not need_yesterday:
+        if not filepath or not Path(filepath).exists():
+            return set()
         entries = read_entries(filepath)
         return {e.get("link") for e in entries if e.get("link")}
-    else:
-        # 旧版Markdown格式
-        try:
-            entries = read_entries(filepath)
-            return {e.get("link") for e in entries if e.get("link")}
-        except Exception:
-            return set()
+
+    all_links = set()
+    if filepath and Path(filepath).exists():
+        all_links.update(
+            {e.get("link") for e in read_entries(filepath) if e.get("link")}
+        )
+
+    yesterday = (now - timedelta(days=1)).date()
+    yesterday_file = get_fetch_file(yesterday)
+    if Path(yesterday_file).exists():
+        all_links.update(
+            {e.get("link") for e in read_entries(yesterday_file) if e.get("link")}
+        )
+
+    return all_links
 
 
 def cleanup_old_files(days: int = 7, data_dir: str = "news-data"):
