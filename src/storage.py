@@ -346,18 +346,18 @@ def cleanup_old_files(days: int = 7, data_dir: str = "news-data"):
         return
 
     cutoff = datetime.now() - timedelta(days=days)
+    deleted_count = 0
 
-    for pattern in ["fetch-*.json", "fetch-*.md", "push-*.md"]:
+    for pattern in ["fetch-*.json", "fetch-*.md", "push-*.md", "notify-*.md"]:
         for file in data_path.glob(pattern):
             try:
-                # 从文件名提取日期
                 date_str = (
                     file.name.replace("fetch-", "")
                     .replace("push-", "")
+                    .replace("notify-", "")
                     .replace(".json", "")
                     .replace(".md", "")
                 )
-                # 处理带时间的文件名 push-YYYY-MM-DD-HH-MM-SS
                 date_parts = date_str.split("-")
                 if len(date_parts) >= 3:
                     file_date = date(
@@ -365,5 +365,10 @@ def cleanup_old_files(days: int = 7, data_dir: str = "news-data"):
                     )
                     if file_date < cutoff.date():
                         file.unlink()
+                        deleted_count += 1
+                        print(f"   🗑️ 删除旧文件: {file.name}")
             except (ValueError, OSError):
                 continue
+
+    if deleted_count > 0:
+        print(f"   ✅ 清理完成: 删除了 {deleted_count} 个旧文件")

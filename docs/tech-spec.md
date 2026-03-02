@@ -288,6 +288,7 @@ daily-news/
 | `tests/test_push_loop.py` |  push循环时间逻辑（约90秒） |测试push循环时间逻辑 应在运行时刻接下来的30s和90s各调用一次push |
 | `tests/run_llm_test.py` |  LLM综合测试 | 依赖fetch_news.py。 根据抓取的信息源，测试llm打分/推送等功能是否正常|
 | `tests/test_fetch_lookback.py` | fetch_lookback_minutes功能测试 | 测试 cutoff 时间计算、阈值逻辑、跨天边界去重 |
+| `tests/test_cleanup_old_files.py` | 旧文件清理测试 | 测试 cleanup_old_files 函数，自动创建/清理不同日期的测试文件 |
 
 #### 1. fetch_news.py - RSS抓取
 
@@ -346,6 +347,13 @@ python tests/run_llm_test.py --all
 ```bash
 # 运行测试
 python tests/test_fetch_lookback.py
+```
+
+#### 6. test_cleanup_old_files.py - 旧文件清理测试
+
+```bash
+# 运行测试
+python tests/test_cleanup_old_files.py
 ```
 
 ## pytest 集成测试
