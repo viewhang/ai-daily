@@ -1,9 +1,13 @@
 ## TODO
 
 当前待办
+
+- [ ] 日志系统，保存到文件，push和fetch分开，
 - [ ] 早报内容格式优化：参考appso / xiaohu / ai gap
+  - [ ] 优先级顺序
+  - [ ] 美化排版
 - [ ] 添加更多信息源，如 TechCrunch、GitHub Trending
-- [ ] x 用户post提取： DAIR.AI
+- [ ] x 新增加用户rss源创建： DAIR.AI
 - [ ] 允许fetch链接中的内容对信息进行扩展
 
 长期待办

@@ -38,12 +38,51 @@
 
 ### 数据流
 
-```
-RSS Sources → Fetch Loop → LLM评分 → fetch-YYYY-MM-DD.json
-                                      ↓
-                                [score >= 90] → 即时推送
-                                      ↓
-                                [定时触发] → Push Loop → push-*.md
+```mermaid
+flowchart LR
+    subgraph RSS源 ["📡 RSS Sources"]
+        direction LR
+        RS1[Twitter/X]
+        RS2[媒体报道]
+        RS3[技术博客]
+        RS4[微信公众号]
+    end
+
+    subgraph 存储层 ["💾 Storage (news-data/)"]
+        DB[(JSON/MD文件存储)]
+    end
+
+    subgraph Fetch循环 ["🔄 Fetch Loop"]
+        FL[定时抓取 RSS] --> MD[HTML转Markdown] --> LLM[LLM智能评分]
+
+        subgraph 即时推送 ["⚡ Instant Push (score >= 90)"]
+            HOT{评分 >= 90?} -->|是| IP[即时推送]
+        end
+    end
+
+    subgraph Push循环 ["📅 Push Loop"]
+        CRON{cron定时触发}
+        PROC[读取评分数据]
+        PUSH[生成 push-*.md]
+        PLAT[推送至 Discord/飞书]
+    end
+
+    RSS源 --> FL
+
+    LLM --> HOT
+    HOT -->|否| DB
+    IP --> DB
+
+    DB --> PROC
+
+    CRON --> PROC
+    PROC --> PUSH
+    PUSH --> PLAT
+
+    style RSS源 fill:#e1f5fe
+    style 存储层 fill:#fff8e1
+    style Fetch循环 fill:#e8f5e9
+    style Push循环 fill:#f3e5f5
 ```
 
 ## 关键模块
