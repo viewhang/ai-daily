@@ -64,7 +64,7 @@ flowchart LR
         CRON{cron定时触发}
         PROC[读取评分数据]
         PUSH[生成 push-*.md]
-        PLAT[推送至 Discord/飞书]
+        PLAT[推送至 Discord/飞书/钉钉]
     end
 
     RSS源 --> FL
@@ -232,6 +232,10 @@ JSON 格式:
     "feishu": {
       "enabled": false,
       "apiKeyName": "FEISHU_WEBHOOK_URL"
+    },
+    "dingtalk": {
+      "enabled": false,
+      "apiKeyName": "DINGTALK_WEBHOOK_URL"
     }
   }
 }
@@ -255,6 +259,7 @@ JSON 格式:
 | LLM API Key | `OPENROUTER_API_KEY` | 在 `llm.apiKeyName` 中指定 |
 | Discord Webhook | `DISCORD_WEBHOOK_URL` | 在 `push.discord.apiKeyName` 中指定 |
 | 飞书 Webhook | `FEISHU_WEBHOOK_URL` | 在 `push.feishu.apiKeyName` 中指定 |
+| 钉钉 Webhook | `DINGTALK_WEBHOOK_URL` | 在 `push.dingtalk.apiKeyName` 中指定 |
 
 ## 目录结构
 
@@ -270,8 +275,11 @@ daily-news/
 │   └── push/            # 推送平台
 │       ├── __init__.py
 │       ├── base.py      # 基类
+│       ├── dingtalk.py
 │       ├── discord.py
 │       └── feishu.py
+├── Dockerfile              # 容器镜像构建文件
+├── .dockerignore           # Docker 构建忽略规则
 ├── tests/
 │   ├── conftest.py         # pytest fixtures
 │   ├── test_config.py      # 配置模块测试
@@ -289,12 +297,29 @@ daily-news/
 │   ├── fetch-*.json
 │   └── push-*.md
 ├── prompts/             # LLM 提示词
-│   ├── score.txt
-│   ├── immediate_push.txt
-│   └── digest.txt
+│   ├── score_batch.md
+│   ├── immediate_push.md
+│   └── digest.md
 └── resources/
     └── rss.opml         # RSS 订阅源
 ```
+
+## Docker 启动
+
+```bash
+docker build -t ai-daily:latest .
+
+docker run -d --name ai-daily \
+  --env-file .env \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/news-data:/app/news-data \
+  ai-daily:latest
+```
+
+说明：
+- 通过 `--env-file .env` 注入 API Key 与 Webhook
+- `config.json` 建议只读挂载，避免容器内误修改
+- `news-data` 建议挂载到宿主机，确保抓取/推送数据持久化
 
 ## 扩展指南
 
@@ -307,7 +332,7 @@ daily-news/
 
 ### 修改评分逻辑
 
-编辑 `prompts/score.txt`，调整评分标准。
+编辑 `prompts/score_batch.md`，调整评分标准。
 
 ### 添加新源
 
@@ -430,7 +455,7 @@ python tests/test_push_loop.py
 | llm.py | `test_llm.py` | 16 | prompt加载、JSON解析、分批处理、评分合并 |
 | processor.py | `test_processor.py` | 14 | HTML→Markdown、相对链接、xgo.ing移除 |
 | main.py | `test_main.py` | 16 | 时间解析、推送时间计算、条目收集 |
-| push/ | `test_push.py` | 17 | Discord/企业微信配置、消息分割、推送验证 |
+| push/ | `test_push.py` | 17 | Discord/飞书/钉钉配置、消息分割、推送验证 |
 | timezone/ | `test_timezone.py` | 11 | 时区转换、datetime操作 |
 | fixtures | `conftest.py` | - | 共享fixtures |
 | **合计** | | **132** | |

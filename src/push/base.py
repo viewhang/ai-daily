@@ -1,6 +1,6 @@
 """推送平台基类"""
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Dict, Optional
 
 
 class PushPlatform(ABC):
@@ -15,6 +15,6 @@ class PushPlatform(ABC):
         pass
 
     @abstractmethod
-    async def send(self, content: str, title: str = None):
+    async def send(self, content: str, title: Optional[str] = None):
         """发送内容"""
         pass

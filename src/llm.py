@@ -6,7 +6,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 def load_prompt(prompt_path: str, **kwargs) -> str:
@@ -70,7 +70,7 @@ async def call_llm(prompt: str, config: Dict) -> str:
             return data["choices"][0]["message"]["content"]
 
 
-def _build_batch_prompt(entries: List[Dict], prompt_path: str = None) -> str:
+def _build_batch_prompt(entries: List[Dict], prompt_path: Optional[str] = None) -> str:
     """构建批量评分prompt"""
     # 构建entries JSON列表（只包含必要字段）
     entries_for_llm = []
@@ -284,7 +284,7 @@ async def generate_immediate_push(
         recent_push_context: 近期推送上下文，用于去重
     """
     prompt_path = config.get("prompts", {}).get(
-        "immediate_push", "prompts/immediate_push.txt"
+        "immediate_push", "prompts/immediate_push.md"
     )
 
     # 直接使用传入的entries，转为JSON格式传给prompt

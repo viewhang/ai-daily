@@ -1,7 +1,7 @@
 """飞书推送平台"""
 
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import aiohttp
 
@@ -24,7 +24,7 @@ class FeishuPlatform(PushPlatform):
         webhook = os.environ.get(api_key_name, "")
         return bool(webhook)
 
-    async def send(self, content: str, title: str = None):
+    async def send(self, content: str, title: Optional[str] = None):
         """发送到飞书"""
         chunks = self._split_content(content, limit=8000)
 
@@ -39,7 +39,7 @@ class FeishuPlatform(PushPlatform):
                     if data.get("code") != 0:
                         raise RuntimeError(f"飞书推送失败: {data.get('msg')}")
 
-    def _build_payload(self, content: str, title: str = None) -> Dict:
+    def _build_payload(self, content: str, title: Optional[str] = None) -> Dict:
         """
         构建飞书卡片消息 payload，支持 Markdown，
         参考  https://open.feishu.cn/document/feishu-cards/card-json-v2-structure

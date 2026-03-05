@@ -26,8 +26,17 @@
 | LLM 评分 | 批量 JSON | 减少 API 调用次数 |
 | 状态追踪 | 文件时间戳 | 无需外部数据库 |
 | RSS延迟防护 | fetch_lookback_minutes | 防止RSS延迟导致漏读 |
+| 推送渠道扩展 | 增加钉钉机器人支持 | 覆盖企业常见通知场景，复用现有 Webhook 配置模式 |
+| 运行方式扩展 | 提供 Dockerfile 容器化启动 | 降低部署门槛，统一运行环境 |
 
 ## 开发进度
+
+**2026-03-05**
+- 新增钉钉机器人推送支持：增加 `src/push/dingtalk.py`，支持 Markdown 分片推送
+- 推送工厂注册 `dingtalk` 渠道，配置项新增 `push.dingtalk`
+- 更新 `.env.example`、`README.md`、`docs/tech-spec.md` 的钉钉配置说明
+- 新增 `Dockerfile` 和 `.dockerignore`，支持容器化构建与运行
+- 更新 `README.md` 和 `docs/tech-spec.md` 的 Docker 启动说明
 
 **2026-03-03**
 - 采用 MIT 许可开源项目，添加 LICENSE 和 NOTICE 文件

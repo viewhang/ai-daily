@@ -1,7 +1,7 @@
 """Discord推送平台"""
 
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import aiohttp
 
@@ -24,7 +24,7 @@ class DiscordPlatform(PushPlatform):
         webhook = os.environ.get(api_key_name, "")
         return bool(webhook and webhook.startswith("https://discord.com/api/webhooks/"))
 
-    async def send(self, content: str, title: str = None):
+    async def send(self, content: str, title: Optional[str] = None):
         """发送到Discord"""
         chunks = self._split_content(content, limit=2000)
 

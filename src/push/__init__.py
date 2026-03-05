@@ -3,6 +3,7 @@
 from typing import Dict, Optional
 
 from .base import PushPlatform
+from .dingtalk import DingTalkPlatform
 from .discord import DiscordPlatform
 from .feishu import FeishuPlatform
 
@@ -12,6 +13,7 @@ def create_platform(name: str, config: Dict) -> Optional[PushPlatform]:
     platforms = {
         "discord": DiscordPlatform,
         "feishu": FeishuPlatform,
+        "dingtalk": DingTalkPlatform,
     }
 
     if name not in platforms:
@@ -26,7 +28,9 @@ def create_platform(name: str, config: Dict) -> Optional[PushPlatform]:
     return platform
 
 
-async def send_to_platforms(content: str, push_config: Dict, title: str = None):
+async def send_to_platforms(
+    content: str, push_config: Dict, title: Optional[str] = None
+):
     """发送内容到所有已启用且配置有效的平台"""
     for platform_name, platform_conf in push_config.items():
         platform = create_platform(platform_name, platform_conf)

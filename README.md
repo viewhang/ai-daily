@@ -3,7 +3,7 @@
 
 ![AI Daily Banner](https://cdn.yeekal.com/yee/blog/2026-03/ai-daily-cover-wide-ultra.webp)
 
-<p align="center">AI 驱动的 RSS 新闻聚合与推送系统 | 支持 400+ 信息源 | LLM 智能评分 | 推送到 Discord/飞书</p>
+<p align="center">AI 驱动的 RSS 新闻聚合与推送系统 | 支持 400+ 信息源 | LLM 智能评分 | 推送到 Discord/飞书/钉钉</p>
 
 
 
@@ -63,6 +63,9 @@ FEISHU_WEBHOOK_URL=your_feishu_webhook_url_here
 
 # Or Discord Webhook
 # DISCORD_WEBHOOK_URL=your_webhook_url_here
+
+# Or DingTalk Webhook
+# DINGTALK_WEBHOOK_URL=your_dingtalk_webhook_url_here
 ```
 
 在 `config.json` 中修改 `llm` 和 `push`
@@ -99,6 +102,11 @@ FEISHU_WEBHOOK_URL=your_feishu_webhook_url_here
 2. 整合 → Webhooks
 2. 创建新 Webhook，复制 URL
 
+**获取钉钉机器人 Webhook：**
+1. 群设置 → 智能群助手 → 添加机器人
+2. 选择自定义机器人并启用
+3. 复制 Webhook URL
+
 
 ### 4. 运行程序
 
@@ -109,6 +117,30 @@ python -m src.main
 首次运行会自动创建 `news-data/` 目录并开始抓取数据。
 
 > 若未配置推送渠道，则可以在 news-data 目录查看生成的push信息
+
+### 5. Docker 运行
+
+#### 构建镜像
+
+```bash
+docker build -t ai-daily:latest .
+```
+
+#### 启动容器
+
+```bash
+docker run -d --name ai-daily \
+  --env-file .env \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/news-data:/app/news-data \
+  ai-daily:latest
+```
+
+说明：
+- `--env-file .env` 用于注入 API Key / Webhook 等敏感配置
+- `config.json` 建议以只读挂载，便于本地修改配置后立即生效
+- `news-data` 使用数据卷持久化，避免容器重建后丢失抓取与推送记录
+- 查看日志：`docker logs -f ai-daily`
 
 ---
 
@@ -170,10 +202,9 @@ python -m src.main
         "max_prompt_chars": 128000,  // 单次prompt最大字符数
         "max_concurrent_batches": 3,  // 最大并发批次数
         "prompts": {  // prompt文件路径
-            "score": "prompts/score.txt",
-            "score_batch": "prompts/score_batch.txt",
-            "immediate_push": "prompts/immediate_push.txt",
-            "digest": "prompts/digest.txt"
+            "score_batch": "prompts/score_batch.md",
+            "immediate_push": "prompts/immediate_push.md",
+            "digest": "prompts/digest.md"
         }
     },
 
@@ -186,6 +217,10 @@ python -m src.main
         "feishu": {
             "enabled": false,
             "apiKeyName": "FEISHU_WEBHOOK_URL"
+        },
+        "dingtalk": {
+            "enabled": false,
+            "apiKeyName": "DINGTALK_WEBHOOK_URL"
         }
     }
 }
@@ -257,6 +292,8 @@ python -m src.main
 | `discord.apiKeyName` | string | Discord Webhook 的环境变量名 |
 | `feishu.enabled` | boolean | 是否启用飞书推送 |
 | `feishu.apiKeyName` | string | 飞书 Webhook 的环境变量名 |
+| `dingtalk.enabled` | boolean | 是否启用钉钉机器人推送 |
+| `dingtalk.apiKeyName` | string | 钉钉 Webhook 的环境变量名 |
 
 ---
 
@@ -350,7 +387,7 @@ pytest tests/pytest/test_llm.py -v
 
 ### 修改评分逻辑
 
-编辑 `prompts/score.txt`，调整评分标准和权重。
+编辑 `prompts/score_batch.md`，调整评分标准和权重。
 
 ### 自定义 LLM 模型
 
