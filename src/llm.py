@@ -397,3 +397,26 @@ async def compose_digest(
         return await call_llm(prompt, config)
     except Exception:
         raise
+
+
+async def summarize_github_trending(
+    enriched_repos: List[Dict], config: Dict
+) -> Tuple[str, Optional[str]]:
+    """GH 板块总结:从 enriched 候选中选 1-max_items + 写 markdown。不传历史上下文。"""
+    prompt_path = config.get("prompts", {}).get(
+        "section_github", "prompts/section_github.md"
+    )
+    max_items = (
+        config.get("sections", {}).get("github_trending", {}).get("max_items", 3)
+    )
+    prompt = load_prompt(
+        prompt_path,
+        repos_json=json.dumps(enriched_repos, ensure_ascii=False, indent=2),
+        max_items=max_items,
+    )
+    try:
+        return await call_llm(prompt, config), None
+    except Exception as e:
+        msg = f"summarize_github_trending 失败: {e}"
+        print(f"⚠️ {msg}")
+        return "", msg
