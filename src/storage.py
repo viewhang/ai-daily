@@ -129,6 +129,38 @@ def _extract_push_titles(content: str) -> List[tuple]:
     return results
 
 
+_SECTION_RE_CACHE: Dict[str, re.Pattern] = {}
+
+
+def _section_re(section: str) -> re.Pattern:
+    """获取/缓存 sentinel 正则。section 名做转义,允许字母数字下划线"""
+    if section not in _SECTION_RE_CACHE:
+        s = re.escape(section)
+        pattern = rf"<!--\s*SECTION:{s}\s*BEGIN\s*-->(.*?)<!--\s*SECTION:{s}\s*END\s*-->"
+        _SECTION_RE_CACHE[section] = re.compile(pattern, flags=re.DOTALL)
+    return _SECTION_RE_CACHE[section]
+
+
+def extract_section(push_md: str, section: str) -> str:
+    """从 push 文件内容中切出 <!-- SECTION:{section} BEGIN/END --> 之间的 markdown。
+
+    向后兼容:
+    - 新文件(带 sentinel): 返回 sentinel 边界内的原文(不去边界空行)
+    - 老文件(无 sentinel) 且 section == 'rss': 返回整个 push_md
+    - 老文件(无 sentinel) 且 section != 'rss': 返回空字符串
+    - sentinel 残缺(只有 BEGIN 没有 END): 返回空字符串
+    """
+    match = _section_re(section).search(push_md)
+    if match:
+        return match.group(1)
+
+    # 老文件兜底:rss 段视为整个 body
+    has_any_sentinel = "<!-- SECTION:" in push_md
+    if section == "rss" and not has_any_sentinel:
+        return push_md
+    return ""
+
+
 def load_recent_notify_titles(
     context_days: int = 3, data_dir: str = "news-data"
 ) -> str:
