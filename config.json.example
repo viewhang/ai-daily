@@ -14,7 +14,32 @@
         "fetch_interval_minutes": 30,
         "fetch_lookback_minutes": 120,
         "push_cron": ["0 8 * * *", "0 17 * * *"],
+        "morning_cron": "0 8 * * *",
+        "morning_match_tolerance_minutes": 5,
         "timezone_hours": 8
+    },
+    "sections": {
+        "github_trending": {
+            "enabled": true,
+            "max_items": 3,
+            "max_deep_dive": 10,
+            "readme_max_chars": 3000,
+            "history_file": "news-data/trending-history.json",
+            "request_timeout": 10,
+            "tokenName": "GITHUB_TOKEN"
+        },
+        "hackernews": {
+            "enabled": true,
+            "select_k": 1,
+            "top_comments": 20,
+            "comment_max_chars": 500,
+            "link_content_max_chars": 3000,
+            "request_timeout": 10,
+            "algolia_base": "https://hn.algolia.com/api/v1"
+        },
+        "insights": {
+            "enabled": true
+        }
     },
     "fetch": {
         "max_workers": 10,
@@ -30,7 +55,11 @@
         "prompts": {
             "score_batch": "prompts/score_batch.md",
             "immediate_push": "prompts/immediate_push.md",
-            "digest": "prompts/digest.md"
+            "digest": "prompts/digest.md",
+            "section_github": "prompts/section_github.md",
+            "section_hackernews_select": "prompts/section_hackernews_select.md",
+            "section_hackernews": "prompts/section_hackernews.md",
+            "insights": "prompts/insights.md"
         }
     },
     "push": {
