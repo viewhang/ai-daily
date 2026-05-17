@@ -392,19 +392,30 @@ def convert_fetch_json_to_md(json_filepath: str, md_filepath: str = None) -> str
     return md_content
 
 
-def save_push_file(filepath: str, content: str, source_count: int, total_entries: int):
-    """保存推送文件（Markdown格式）"""
+def save_push_file(
+    filepath: str,
+    content: str,
+    source_count: int,
+    total_entries: int,
+    profile: str = "default",
+):
+    """保存推送文件（Markdown格式）
+
+    Args:
+        profile: "morning" | "default"  ← 早报或常规;写入 frontmatter,便于按 profile 分析
+    """
     path = Path(filepath)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     push_time = datetime.now(get_timezone())
-    frontmatter = f"""---
-pushDate: "{push_time.isoformat()}"
-sourceCount: {source_count}
-totalEntries: {total_entries}
----
-
-"""
+    frontmatter = (
+        "---\n"
+        f'pushDate: "{push_time.isoformat()}"\n'
+        f'profile: "{profile}"\n'
+        f"sourceCount: {source_count}\n"
+        f"totalEntries: {total_entries}\n"
+        "---\n\n"
+    )
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(frontmatter + content)

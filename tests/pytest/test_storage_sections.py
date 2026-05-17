@@ -128,3 +128,20 @@ class TestTrendingHistory:
         # 再过 1 天就出区间
         h.cleanup(today=date(2026, 5, 18), keep_days=7)
         assert "https://github.com/a/b" not in h
+
+
+class TestSavePushFileProfile:
+    def test_default_profile_when_not_specified(self, tmp_path):
+        f = tmp_path / "push-x.md"
+        save_push_file(str(f), "body content", source_count=1, total_entries=1)
+        text = f.read_text(encoding="utf-8")
+        assert 'profile: "default"' in text
+        assert "body content" in text
+
+    def test_morning_profile(self, tmp_path):
+        f = tmp_path / "push-x.md"
+        save_push_file(
+            str(f), "body", source_count=2, total_entries=3, profile="morning"
+        )
+        text = f.read_text(encoding="utf-8")
+        assert 'profile: "morning"' in text
