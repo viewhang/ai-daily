@@ -353,8 +353,57 @@ async def _run_default_push(config: Dict):
 
 
 async def _run_morning_push(config: Dict):
-    """早报时段:四模块编排 + sentinel 拼装 (Task 21 实现)"""
-    raise NotImplementedError("Task 21 implements morning push")
+    """早报四模块编排:RSS/GH/HN 并发 → insights 串行 → sentinel 拼装 → 推送 → 落盘。
+
+    失败语义:
+    - RSS 失败 → 整体抛 RuntimeError (核心承诺不变)
+    - GH/HN/insights 失败 → 该段省略 + 告警,其他段照推
+    """
+    now = now_local(config)
+
+    rss_result, gh_result, hn_result = await asyncio.gather(
+        run_rss_section(config, now),
+        run_github_section(config, now),
+        run_hackernews_section(config, now),
+    )
+
+    rss_md, rss_err = rss_result
+    gh_md, gh_err = gh_result
+    hn_md, hn_err = hn_result
+
+    if gh_err:
+        await notify_llm_errors("section_github", [gh_err], config)
+    if hn_err:
+        await notify_llm_errors("section_hackernews", [hn_err], config)
+
+    if rss_err and not rss_md:
+        await notify_llm_errors("compose_digest", [rss_err], config)
+        raise RuntimeError(f"RSS section failed: {rss_err}")
+
+    insights_md, insights_err = await run_insights_section(
+        rss_md, gh_md, hn_md, config, now
+    )
+    if insights_err:
+        await notify_llm_errors("insights", [insights_err], config)
+
+    final = assemble_with_sentinels(
+        {
+            "rss": rss_md,
+            "github": gh_md,
+            "hackernews": hn_md,
+            "insights": insights_md,
+        }
+    )
+
+    if not final.strip():
+        print("ℹ️ 早报无任何段输出,跳过推送")
+        return
+
+    await send_to_platforms(final, config["push"])
+    push_file = get_push_file()
+    rss_count = rss_md.count("###") if rss_md else 0
+    save_push_file(push_file, final, rss_count, rss_count, profile="morning")
+    print(f"💾 已保存早报到 {push_file}")
 
 
 async def fetch_loop(config: Dict):
