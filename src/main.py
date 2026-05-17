@@ -28,6 +28,7 @@ from src.processor import html_to_markdown
 from src.push import send_to_platforms
 from src.storage import (
     append_entries,
+    assemble_with_sentinels,
     cleanup_old_files,
     extract_push_time,
     get_fetch_file,
@@ -41,6 +42,10 @@ from src.storage import (
     save_notify_file,
     save_push_file,
 )
+from src.sections.github.section import run_github_section
+from src.sections.hackernews.section import run_hackernews_section
+from src.sections.insights.section import run_insights_section
+from src.sections.rss.section import run_rss_section
 
 
 async def notify_llm_errors(stage: str, errors: List[str], config: Dict):
@@ -300,55 +305,56 @@ async def run_push_job(config: Dict):
     print(f"📤 Push Job | {now_local().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'=' * 50}")
 
+    if is_morning_push(now_local(config), config):
+        await _run_morning_push(config)
+    else:
+        await _run_default_push(config)
+
+
+async def _run_default_push(config: Dict):
+    """晚报或非早报时段:沿用原有纯 RSS digest 流程"""
     last_push_file = get_last_push_file()
     last_push_time = extract_push_time(last_push_file) if last_push_file else None
-
     if last_push_time:
         print(f"📌 上次推送: {last_push_time.strftime('%Y-%m-%d %H:%M')}")
 
-    # 收集条目：待推送条目 和 上下文条目
     min_score = config["filter"]["min_score"]
     context_days = config["filter"]["context_days"]
-
-    # 已经根据min_score 去除得分较低的数据
     to_push, context = collect_entries_for_push(
         last_push_time=last_push_time,
         context_days=context_days,
         min_score=min_score,
     )
-
-    total_qualified = len(to_push) + len(context)
     print(
-        f"📋 符合标准条目: {total_qualified} 条 (待推送: {len(to_push)}, 上下文参考: {len(context)})"
+        f"📋 待推送 {len(to_push)} / 上下文 {len(context)} (≥{min_score} 分)"
     )
-
     if not to_push:
         print("ℹ️ 没有新消息需要推送")
         return
 
-    print(f"✅ 符合推送标准(≥{min_score}分): {len(to_push)} 条")
-
-    # 加载近期已推送事件清单（仅供 LLM 查重，避免风格趋同）
     push_context_days = config["filter"].get("push_context_days", 5)
-    recent_push_context_str = load_recent_push_titles(push_context_days)
+    recent = load_recent_push_titles(push_context_days)
 
     print("🤖 生成推送内容...")
     try:
         push_content = await compose_digest(
-            to_push, context, config["llm"], recent_push_context=recent_push_context_str
+            to_push, context, config["llm"], recent_push_context=recent
         )
     except Exception as e:
         print(f"生成汇总推送失败: {e}")
         await notify_llm_errors("compose_digest", [str(e)], config)
-        return
+        raise
 
     await send_to_platforms(push_content, config["push"])
-
     push_file = get_push_file()
-    save_push_file(push_file, push_content, len(to_push), len(to_push))
+    save_push_file(push_file, push_content, len(to_push), len(to_push), profile="default")
     print(f"💾 已保存到 {push_file}")
-
     print(f"✅ Push Job 完成 | 推送: {len(to_push)} 条")
+
+
+async def _run_morning_push(config: Dict):
+    """早报时段:四模块编排 + sentinel 拼装 (Task 21 实现)"""
+    raise NotImplementedError("Task 21 implements morning push")
 
 
 async def fetch_loop(config: Dict):
