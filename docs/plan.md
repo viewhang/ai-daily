@@ -16,7 +16,7 @@
 - [ ] 增加图片/信息图
 - [ ] 推送到知乎 / 小红书 / 网站
 
-## 技术决策
+## 技术决策记录
 
 | 决策 | 方案 | 原因 |
 |------|------|------|
@@ -31,7 +31,23 @@
 | RSS延迟防护 | fetch_lookback_minutes | 防止RSS延迟导致漏读 |
 | LLM异常通知 | 调用方统一上报 | 避免批次级刷屏，同时保留关键异常通知 |
 
+### 2026-05-17: 早报扩展板块
+
+- 决策:在 RSS digest 之上为早报增加 GitHub Trending / Hacker News / 跨板块洞察三段
+- 触发条件:`schedule.morning_cron` 命中(± `morning_match_tolerance_minutes`)
+- 模块边界:四个自治模块在 `src/sections/<board>/`,push_job 上游统一包 sentinel
+- GH:单页 trending HTML 抓取 → history 去重 → REST API 拿 README+topics+metadata → LLM 选 1-3
+- HN:首页 HTML → 轻 LLM 选 K(默认 1)→ Algolia API 拉评论 + html_to_markdown 拉外链 → LLM 行文
+- 失败语义:RSS 失败整体退出;其余板块失败省略本段 + 告警
+- 详细设计:`docs/extra-sections-design.md`;实施计划:`docs/superpowers/plans/2026-05-17-extra-sections.md`
+
 ## 开发进度
+
+### 2026-05-17
+
+- ✅ 设计完成,详见 `docs/extra-sections-design.md`
+- ✅ 实施计划完成,详见 `docs/superpowers/plans/2026-05-17-extra-sections.md`
+- 🔄 实施中(按计划分 28 个任务推进)
 
 **2026-05-15**
 - 优化提示词，修复长时运行下的新闻报告措辞趋同问题
