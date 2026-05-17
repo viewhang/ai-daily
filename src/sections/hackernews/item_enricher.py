@@ -3,9 +3,13 @@
 Algolia API: GET /api/v1/items/{id}
 - root.text 是 Show HN / Ask HN 的 post 正文
 - root.children[] 是顶层评论(按 HN ranking 排序)
+
+外链正文优先走 Jina Reader (https://r.jina.ai/<url>, 返回 markdown),
+失败回退到直接 GET + html_to_markdown。JINA_API_KEY 可选,配置后免费额度更高。
 """
 
 import asyncio
+import os
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp
@@ -16,6 +20,8 @@ USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+
+JINA_READER_BASE = "https://r.jina.ai"
 
 
 def _is_internal_hn_url(url: str) -> bool:
@@ -45,6 +51,34 @@ async def _fetch_url_html(
         return await resp.text()
 
 
+async def _fetch_via_jina(
+    session: aiohttp.ClientSession, url: str, timeout: int
+) -> str:
+    """通过 Jina Reader 拉取外链 markdown。JINA_API_KEY 可选,配置后免费额度更高。"""
+    jina_url = f"{JINA_READER_BASE}/{url}"
+    headers = {"Accept": "text/markdown"}
+    api_key = os.environ.get("JINA_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    async with session.get(
+        jina_url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)
+    ) as resp:
+        if resp.status != 200:
+            raise RuntimeError(f"Jina Reader {url} 返回 {resp.status}")
+        return await resp.text()
+
+
+async def _fetch_external_markdown(
+    session: aiohttp.ClientSession, url: str, timeout: int
+) -> str:
+    """获取外链正文 markdown:先走 Jina Reader,失败回退到直接 GET + html_to_markdown。"""
+    try:
+        return await _fetch_via_jina(session, url, timeout)
+    except Exception:
+        html = await _fetch_url_html(session, url, timeout)
+        return html_to_markdown(html, base_url=url)
+
+
 async def enrich_story(
     session: aiohttp.ClientSession,
     story: Dict,
@@ -64,11 +98,13 @@ async def enrich_story(
         )
     ]
     if not is_internal:
-        tasks.append(_fetch_url_html(session, story["url"], timeout=timeout))
+        tasks.append(
+            _fetch_external_markdown(session, story["url"], timeout=timeout)
+        )
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     algolia_result = results[0]
-    external_html_result = results[1] if not is_internal else None
+    external_markdown_result = results[1] if not is_internal else None
 
     comments_list: List[str] = []
     post_text = ""
@@ -87,10 +123,11 @@ async def enrich_story(
         if post_text:
             link_content = html_to_markdown(post_text)[:link_content_max_chars]
     else:
-        if not isinstance(external_html_result, Exception) and external_html_result:
-            link_content = html_to_markdown(
-                external_html_result, base_url=story["url"]
-            )[:link_content_max_chars]
+        if (
+            not isinstance(external_markdown_result, Exception)
+            and external_markdown_result
+        ):
+            link_content = external_markdown_result[:link_content_max_chars]
 
     return {
         **story,

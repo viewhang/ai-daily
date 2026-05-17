@@ -35,15 +35,15 @@ async def test_enrich_external_link_story():
     async def fake_algolia(session, item_id, **kw):
         return algolia_payload
 
-    async def fake_link(session, url, **kw):
-        return "<html><body><p>link body</p></body></html>"
+    async def fake_external(session, url, **kw):
+        return "link body"
 
     with patch(
         "src.sections.hackernews.item_enricher._fetch_algolia_item",
         new=AsyncMock(side_effect=fake_algolia),
     ), patch(
-        "src.sections.hackernews.item_enricher._fetch_url_html",
-        new=AsyncMock(side_effect=fake_link),
+        "src.sections.hackernews.item_enricher._fetch_external_markdown",
+        new=AsyncMock(side_effect=fake_external),
     ):
         enriched = await enrich_story(
             session=MagicMock(),
@@ -80,7 +80,7 @@ async def test_enrich_show_hn_uses_root_text_no_external_fetch():
     async def fake_algolia(session, item_id, **kw):
         return algolia_payload
 
-    async def fake_link(session, url, **kw):
+    async def fake_external(session, url, **kw):
         link_calls.append(url)
         return "should not be called"
 
@@ -88,8 +88,8 @@ async def test_enrich_show_hn_uses_root_text_no_external_fetch():
         "src.sections.hackernews.item_enricher._fetch_algolia_item",
         new=AsyncMock(side_effect=fake_algolia),
     ), patch(
-        "src.sections.hackernews.item_enricher._fetch_url_html",
-        new=AsyncMock(side_effect=fake_link),
+        "src.sections.hackernews.item_enricher._fetch_external_markdown",
+        new=AsyncMock(side_effect=fake_external),
     ):
         enriched = await enrich_story(
             session=MagicMock(),
@@ -117,20 +117,20 @@ async def test_enrich_truncates_comments_and_link():
         "comments_url": "x",
     }
     long_comment = "<p>" + ("y" * 2000) + "</p>"
-    long_link = "<html><body>" + ("z" * 5000) + "</body></html>"
+    long_link = "z" * 5000
 
     async def fake_algolia(session, item_id, **kw):
         return {"text": None, "children": [{"text": long_comment}]}
 
-    async def fake_link(session, url, **kw):
+    async def fake_external(session, url, **kw):
         return long_link
 
     with patch(
         "src.sections.hackernews.item_enricher._fetch_algolia_item",
         new=AsyncMock(side_effect=fake_algolia),
     ), patch(
-        "src.sections.hackernews.item_enricher._fetch_url_html",
-        new=AsyncMock(side_effect=fake_link),
+        "src.sections.hackernews.item_enricher._fetch_external_markdown",
+        new=AsyncMock(side_effect=fake_external),
     ):
         enriched = await enrich_story(
             session=MagicMock(),
@@ -161,15 +161,15 @@ async def test_enrich_failure_returns_partial():
     async def fake_algolia(session, item_id, **kw):
         raise RuntimeError("algolia down")
 
-    async def fake_link(session, url, **kw):
-        return "<html><body>ok</body></html>"
+    async def fake_external(session, url, **kw):
+        return "ok"
 
     with patch(
         "src.sections.hackernews.item_enricher._fetch_algolia_item",
         new=AsyncMock(side_effect=fake_algolia),
     ), patch(
-        "src.sections.hackernews.item_enricher._fetch_url_html",
-        new=AsyncMock(side_effect=fake_link),
+        "src.sections.hackernews.item_enricher._fetch_external_markdown",
+        new=AsyncMock(side_effect=fake_external),
     ):
         enriched = await enrich_story(
             session=MagicMock(),
