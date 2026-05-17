@@ -523,3 +523,61 @@ def load_recent_section_titles(
         )
 
     return "\n".join(f"- [{t}] {title}" if t else f"- {title}" for t, title in items)
+
+
+class TrendingHistory:
+    """GitHub trending 已查阅 repo 索引。
+
+    repos 字段:url → last_seen_date (ISO YYYY-MM-DD)。
+    每次早报 cleanup 一次,touch 完所有今日 URL 后 save。
+    """
+
+    def __init__(self, path: str, repos: Dict[str, str]):
+        self._path = path
+        self.repos: Dict[str, str] = dict(repos)
+
+    def __contains__(self, url: str) -> bool:
+        return url in self.repos
+
+    def touch(self, url: str, today: date) -> None:
+        self.repos[url] = today.isoformat()
+
+    def cleanup(self, today: date, keep_days: int) -> None:
+        cutoff = today - timedelta(days=keep_days)
+        self.repos = {
+            url: d
+            for url, d in self.repos.items()
+            if _parse_iso_date_safe(d) is not None
+            and _parse_iso_date_safe(d) >= cutoff
+        }
+
+    def save(self) -> None:
+        path = Path(self._path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "repos": self.repos,
+            "updated_at": datetime.now(get_timezone()).isoformat(),
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def _parse_iso_date_safe(s: str) -> Optional[date]:
+    try:
+        return date.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def load_trending_history(path: str) -> TrendingHistory:
+    """读取 trending-history.json;不存在返回空实例。"""
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return TrendingHistory(path, {})
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return TrendingHistory(path, data.get("repos", {}))
+    except (json.JSONDecodeError, OSError):
+        print(f"⚠️ trending-history 读取失败,使用空索引: {path}")
+        return TrendingHistory(path, {})

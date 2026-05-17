@@ -74,3 +74,57 @@ class TestLoadRecentSectionTitles:
         gh_titles = load_recent_section_titles("github", 3, str(tmp_path))
         assert "GH Repo Title" in gh_titles
         assert "RSS Title One" not in gh_titles
+
+
+from storage import TrendingHistory, load_trending_history
+
+
+class TestTrendingHistory:
+    def test_load_missing_file(self, tmp_path):
+        path = tmp_path / "trending.json"
+        h = load_trending_history(str(path))
+        assert h.repos == {}
+
+    def test_touch_then_save_then_reload(self, tmp_path):
+        path = tmp_path / "trending.json"
+        h = load_trending_history(str(path))
+        today = date(2026, 5, 17)
+        h.touch("https://github.com/a/b", today)
+        h.touch("https://github.com/c/d", today)
+        h.save()
+
+        h2 = load_trending_history(str(path))
+        assert h2.repos == {
+            "https://github.com/a/b": "2026-05-17",
+            "https://github.com/c/d": "2026-05-17",
+        }
+
+    def test_contains_returns_membership(self, tmp_path):
+        h = load_trending_history(str(tmp_path / "x.json"))
+        h.touch("https://github.com/a/b", date(2026, 5, 17))
+        assert "https://github.com/a/b" in h
+        assert "https://github.com/x/y" not in h
+
+    def test_cleanup_removes_expired_entries(self, tmp_path):
+        path = tmp_path / "trending.json"
+        path.write_text(
+            '{"repos": {'
+            '"https://github.com/old/repo": "2026-05-01", '
+            '"https://github.com/new/repo": "2026-05-15"'
+            '}, "updated_at": "2026-05-15T00:00:00+08:00"}',
+            encoding="utf-8",
+        )
+        h = load_trending_history(str(path))
+        h.cleanup(today=date(2026, 5, 17), keep_days=7)
+        assert "https://github.com/old/repo" not in h
+        assert "https://github.com/new/repo" in h
+
+    def test_cleanup_keeps_today_inclusive(self, tmp_path):
+        h = load_trending_history(str(tmp_path / "x.json"))
+        h.touch("https://github.com/a/b", date(2026, 5, 10))
+        # 2026-05-10 + 7 days = 2026-05-17 (last_seen 2026-05-10 仍在 keep 区间)
+        h.cleanup(today=date(2026, 5, 17), keep_days=7)
+        assert "https://github.com/a/b" in h
+        # 再过 1 天就出区间
+        h.cleanup(today=date(2026, 5, 18), keep_days=7)
+        assert "https://github.com/a/b" not in h
