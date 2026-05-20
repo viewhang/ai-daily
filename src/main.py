@@ -102,21 +102,25 @@ def calculate_push_times(
 
 
 def is_morning_push(now: datetime, config: Dict) -> bool:
-    """判定当前时刻是否为早报触发点。
+    """判定当前 push 是否为「早报」(触发 GH/HN/insights 三段)。
 
-    用 cron + 容差判定,而非"今天的第一次推送":
-    - 早报失败时,晚报不会错误升级为长版本
-    - 容差直接绑定 cron 表达式,配置直观
+    规则:在 `schedule.push_cron` 列表里,now 离哪条 cron 最近,就归为那条;
+    最近的那条若是当天最早的 cron,则视为早报。
+
+    特例:
+    - `push_cron` 为空 → 不视为早报
+    - `push_cron` 只有一条 → 该条即"最早"也即"最近",任何触发都视为早报
     """
-    morning_cron = config.get("schedule", {}).get("morning_cron")
-    if not morning_cron:
+    cron_list = config.get("schedule", {}).get("push_cron", [])
+    if not cron_list:
         return False
-    tolerance = timedelta(
-        minutes=config["schedule"].get("morning_match_tolerance_minutes", 5)
-    )
+    if len(cron_list) == 1:
+        return True
+
     base = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_fire = croniter(morning_cron, base).get_next(datetime)
-    return abs(now - today_fire) <= tolerance
+    today_fires = [croniter(c, base).get_next(datetime) for c in cron_list]
+    closest = min(today_fires, key=lambda f: abs(now - f))
+    return closest == min(today_fires)
 
 
 def collect_entries_for_push(

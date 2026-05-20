@@ -2,6 +2,7 @@
 
 当前待办
 
+- [ ] 优化提示词： 推送格式；参考链接去除非官方信息； insights 不够深度
 - [ ] 日志系统，保存到文件，push和fetch分开，
 - [ ] 早报内容格式优化：参考appso / xiaohu / ai gap
   - [ ] 优先级顺序
@@ -31,32 +32,12 @@
 | RSS延迟防护 | fetch_lookback_minutes | 防止RSS延迟导致漏读 |
 | LLM异常通知 | 调用方统一上报 | 避免批次级刷屏，同时保留关键异常通知 |
 
-### 2026-05-17: 早报扩展板块
-
-- 决策:在 RSS digest 之上为早报增加 GitHub Trending / Hacker News / 跨板块洞察三段
-- 触发条件:`schedule.morning_cron` 命中(± `morning_match_tolerance_minutes`)
-- 模块边界:四个自治模块在 `src/sections/<board>/`,push_job 上游统一包 sentinel
-- GH:单页 trending HTML 抓取 → history 去重 → REST API 拿 README+topics+metadata → LLM 选 1-3
-- HN:首页 HTML → 轻 LLM 选 K(默认 1)→ Algolia API 拉评论 + html_to_markdown 拉外链 → LLM 行文
-- 失败语义:RSS 失败整体退出;其余板块失败省略本段 + 告警
-- 详细设计:`docs/extra-sections-design.md`;实施计划:`docs/superpowers/plans/2026-05-17-extra-sections.md`
-
 ## 开发进度
 
-### 2026-05-17
+**2026-05-17**
 
-- ✅ 设计完成,详见 `docs/extra-sections-design.md`
-- ✅ 实施计划完成,详见 `docs/superpowers/plans/2026-05-17-extra-sections.md`
-- ✅ 实施完成(28 个任务全部落地;199 单测通过 + 真实 API 烟测 GH/HN 通过;feat/extra-sections 分支待 review/merge)
-- ✅ 合入 main(merge commit `1b2ca68`,--no-ff)
-- ✅ 合入后优化:
-  - 加 GH/HN section 关键步骤日志(每步条数 + 成功/失败计数)
-  - 加 `python -m src.main github` / `hackernews` CLI 子命令(单跑板块,不推送)
-  - 基于真实数据校准截断默认值（保守 → 激进两轮）:
-    - 第一轮:`readme_max_chars 3000→5000`、`comment_max_chars 500→800`、`link_content_max_chars 3000→6000`(仍在 64k budget)
-    - 第二轮:`readme_max_chars→10000`、`top_comments 20→50`、`link_content_max_chars→50000`,同步把 `llm.max_prompt_chars 64000→150000` 充分利用 DeepSeek v4 flash 128k tokens 上下文(详见 extra-sections-design.md §14)
-  - 接入 Jina Reader 拉外链 markdown,失败回退到 html_to_markdown
-  - CLAUDE.md 文档索引补 `docs/extra-sections-design.md` 入口
+- ✅ 早报扩展板块上线：在 RSS digest 之上叠加 GitHub Trending / Hacker News / 跨板块洞察三段，仅 `schedule.morning_cron` 命中时触发，晚报维持纯 RSS 行为
+- 设计与实施详见 [`docs/extra-sections-design.md`](extra-sections-design.md) 与 [`docs/superpowers/plans/2026-05-17-extra-sections.md`](superpowers/plans/2026-05-17-extra-sections.md)
 
 **2026-05-15**
 - 优化提示词，修复长时运行下的新闻报告措辞趋同问题

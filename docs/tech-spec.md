@@ -111,7 +111,7 @@ flowchart LR
 src/                       运行时代码
 ├── main.py                CLI 入口；定义 fetch_job / push_job / loop 的编排顺序
 ├── config.py              加载 config.json，合并 OPML + add/block，做配置校验
-├── fetcher.py             RSS 抓取；并发控制、UA 伪装、域名通配符屏蔽
+├── fetcher.py             RSS 抓取；并发控制、UA 伪装、域名通配符屏蔽；nitter/xcancel 走独立的 requests+Inoreader UA 低并发池
 ├── processor.py           HTML → Markdown 转换
 ├── llm.py                 LLM 客户端;批量评分、即时推送生成、汇总生成、错误聚合
 ├── storage.py             news-data 文件读写;按日期分片;过期清理
@@ -144,7 +144,7 @@ resources/rss.opml         基础 RSS 订阅源(约 420 个),通过 sources.add/
 
 早报推送在 RSS 之上扩展三个板块:GitHub 趋势 / Hacker News 热议 / 跨板块洞察。模块结构、数据流与失败降级详见 `docs/extra-sections-design.md`。架构层关键约束:
 
-- 仅在 `schedule.morning_cron` 命中(± `morning_match_tolerance_minutes`)时启用,晚报维持纯 RSS 行为
+- 仅在当天 `schedule.push_cron` 列表里最早那次触发时启用(单条 cron 时每次都启用),其余时段维持纯 RSS 行为
 - 各板块封装为 `src/sections/<board>/section.py::run_xxx_section(config, now) -> (markdown, error)`
 - `push_job` 用 `asyncio.gather` 并发跑 RSS / GH / HN,串行接 insights;最后用 `<!-- SECTION:xxx BEGIN/END -->` sentinel 包入 push 文件
 - 仅 RSS 失败会让 push_job 整体退出非 0;其余板块失败 → 板块整段省略 + 告警

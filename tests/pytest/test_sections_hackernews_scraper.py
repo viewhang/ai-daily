@@ -1,5 +1,6 @@
 """测试 HN 首页 HTML 解析"""
 
+import json
 import sys
 from pathlib import Path
 
@@ -9,14 +10,15 @@ from src.sections.hackernews.frontpage_scraper import parse_frontpage_html
 
 
 def test_parse_frontpage_returns_stories():
-    fixture = (
-        Path(__file__).parent / "fixtures" / "hn_frontpage.html"
-    ).read_text(encoding="utf-8")
+    fixture = (Path(__file__).parent / "fixtures" / "hn_frontpage.html").read_text(
+        encoding="utf-8"
+    )
 
     stories = parse_frontpage_html(fixture)
-
     assert len(stories) >= 25
     s = stories[0]
+    print(json.dumps(stories[:5], indent=4, ensure_ascii=False))
+
     assert s["id"]
     assert s["title"]
     assert s["url"]

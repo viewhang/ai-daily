@@ -30,7 +30,9 @@ async def main():
     enriched, errors = await enrich_stories(
         [target],
         top_comments=5,
-        comment_max_chars=300,
+        top_l2_per_l1=3,
+        comment_max_chars=2000,
+        comments_total_chars=60000,
         link_content_max_chars=1500,
         timeout=15,
     )

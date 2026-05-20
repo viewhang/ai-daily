@@ -51,7 +51,9 @@ async def run_github_section(
     history.cleanup(today=today, keep_days=keep_days)
     after_cleanup = len(history.repos)
     if before_cleanup != after_cleanup:
-        print(f"🧹 GH: history 清理过期 {before_cleanup - after_cleanup} 条 (剩 {after_cleanup})")
+        print(
+            f"🧹 GH: history 清理过期 {before_cleanup - after_cleanup} 条 (剩 {after_cleanup})"
+        )
 
     # 3. 候选筛选(按 spec §4.3 语义)
     candidates = []
@@ -64,17 +66,17 @@ async def run_github_section(
             candidates.append(repo)
     print(f"🔍 GH: history 过滤掉 {already_seen} 条已见,新候选 {len(candidates)} 条")
 
-    # 4. 候选写回 history + 持久化
-    for repo in candidates:
-        history.touch(repo["url"], today)
-    history.save()
-
     if not candidates:
         print("ℹ️ GH: 无新候选,跳过")
         return "", None
     if len(candidates) > max_deep_dive:
         print(f"✂️ GH: 候选 {len(candidates)} 超 max_deep_dive={max_deep_dive},截断")
         candidates = candidates[:max_deep_dive]
+
+    # 4. 候选写回 history + 持久化
+    for repo in candidates:
+        history.touch(repo["url"], today)
+    history.save()
 
     # 5. 并发 enrich
     print(f"🌐 GH: 并发 enrich {len(candidates)} 个 repo (REST API)...")

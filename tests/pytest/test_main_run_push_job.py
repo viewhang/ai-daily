@@ -13,8 +13,7 @@ from src.main import run_push_job
 
 @pytest.mark.asyncio
 async def test_default_path_when_not_morning(sample_config):
-    sample_config["schedule"]["morning_cron"] = "0 8 * * *"
-    sample_config["schedule"]["morning_match_tolerance_minutes"] = 5
+    sample_config["schedule"]["push_cron"] = ["0 8 * * *", "0 17 * * *"]
     sample_config["filter"]["push_context_days"] = 5
 
     with patch("src.main.is_morning_push", return_value=False), patch(
@@ -30,8 +29,7 @@ async def test_default_path_when_not_morning(sample_config):
 
 @pytest.mark.asyncio
 async def test_morning_path_when_morning(sample_config):
-    sample_config["schedule"]["morning_cron"] = "0 8 * * *"
-    sample_config["schedule"]["morning_match_tolerance_minutes"] = 5
+    sample_config["schedule"]["push_cron"] = ["0 8 * * *", "0 17 * * *"]
     sample_config["filter"]["push_context_days"] = 5
 
     with patch("src.main.is_morning_push", return_value=True), patch(

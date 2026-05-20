@@ -13,7 +13,7 @@
   - **GitHub Trending**：当日热门开源项目中筛选 1-3 个 AI 相关项目
   - **Hacker News**：HN 首页中筛选 1 个最有讨论价值的 AI 相关热议（带评论与外链正文摘要）
   - **行业洞察**：基于上述三个板块 + 历史 insights 段做一段跨板块趋势小结
-- 这三段内容**只在早报时段生成**（命中 `schedule.morning_cron`），晚报维持现有纯 RSS digest 行为
+- 这三段内容**只在早报时段生成**（当天 `schedule.push_cron` 列表里最早那次触发），其余时段维持现有纯 RSS digest 行为
 - 单板块失败 → 降级推送其他板块，整体任务仍算成功；RSS 失败 → 同现有行为，任务非 0 退出
 - 不引入数据库；状态全部落到 `news-data/` 的本地文件
 
@@ -286,9 +286,12 @@ def load_recent_section_titles(section: str, days: int, data_dir="news-data") ->
 
 3. 并发 enrich 选中的 K 个 story
    async for story in selected:
-     - 评论:Algolia GET /api/v1/items/{id}
-         → children[].text 取前 top_comments 条(默认 50,数据 avg=12.7,按 HN ranking)
-         → 每条 html_to_markdown + 截断到 comment_max_chars(默认 800,p75=434)
+     - 评论树:Algolia GET /api/v1/items/{id}
+         → 取前 top_comments 条 L1(默认 30,按 HN ranking)
+         → 每条 L1 下挂前 top_l2_per_l1 条 L2 回复(默认 3)
+         → 每条 text 过 html_to_markdown,单条截断到 comment_max_chars(默认 2000)
+         → 累计达 comments_total_chars(默认 60000) 立即停止,防离群 story 撑爆 prompt
+         → 输出 tree JSON: [{"l1": "...", "replies": ["...", "..."]}, ...]
      - 外链正文:
          if story.url 指向 https://news.ycombinator.com/item?id=... (Show HN/Ask HN):
              从 Algolia 同次返回的 root.text 字段取(无外部请求)
@@ -344,7 +347,10 @@ GET https://hn.algolia.com/api/v1/items/{id}
   "comments": 45,
   "comments_url": "https://news.ycombinator.com/item?id=12345678",
   "link_content": "(markdown, ≤3000 chars; Show HN 时是 post 正文)",
-  "top_comments": ["(≤500 chars)", "...", ...]
+  "top_comments": [
+    {"l1": "(markdown, ≤comment_max_chars)", "replies": ["(markdown, ≤comment_max_chars)", "..."]},
+    ...
+  ]
 }
 ```
 
@@ -550,8 +556,6 @@ async def _run_morning_push(config):
     "fetch_interval_minutes": 30,
     "fetch_lookback_minutes": 120,
     "push_cron": ["0 8 * * *", "0 17 * * *"],
-    "morning_cron": "0 8 * * *",
-    "morning_match_tolerance_minutes": 5,
     "timezone_hours": 8
   },
   "sections": {
@@ -567,8 +571,10 @@ async def _run_morning_push(config):
     "hackernews": {
       "enabled": true,
       "select_k": 1,
-      "top_comments": 50,
-      "comment_max_chars": 800,
+      "top_comments": 30,
+      "top_l2_per_l1": 3,
+      "comment_max_chars": 2000,
+      "comments_total_chars": 60000,
       "link_content_max_chars": 50000,
       "request_timeout": 10,
       "algolia_base": "https://hn.algolia.com/api/v1"
@@ -594,7 +600,7 @@ async def _run_morning_push(config):
 向后兼容：
 
 - `sections` 整段缺失 → 等价于全部 `enabled=false` → push_job 走原有纯 RSS 路径
-- `schedule.morning_cron` 缺失 → 视为"无早报"，不生成新板块（不会因配置遗漏导致每次推送都跑 GH/HN）
+- `push_cron` 为空 → 无早报触发,不生成新板块
 - 旧 push 文件没有 sentinel → `extract_section("rss", ...)` 返回整个 body，其他 section 返回空字符串
 - `GITHUB_TOKEN` 未设 → GH 模块匿名调用，照常运行
 
@@ -620,20 +626,24 @@ async def _run_morning_push(config):
 
 ```python
 def is_morning_push(now: datetime, config: Dict) -> bool:
-    morning_cron = config["schedule"].get("morning_cron")
-    if not morning_cron:
+    cron_list = config.get("schedule", {}).get("push_cron", [])
+    if not cron_list:
         return False
-    tolerance = timedelta(
-        minutes=config["schedule"].get("morning_match_tolerance_minutes", 5)
-    )
+    if len(cron_list) == 1:
+        return True  # 唯一定时即"最早",任何触发都视为早报
+
     base = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_fire = croniter(morning_cron, base).get_next(datetime)
-    return abs(now - today_fire) <= tolerance
+    today_fires = [croniter(c, base).get_next(datetime) for c in cron_list]
+    closest = min(today_fires, key=lambda f: abs(now - f))
+    return closest == min(today_fires)
 ```
 
-为什么不用"今天的第一次 push"作为判定标准：
-- 早报失败 → 晚报变成"今天的第一次"会错误地输出长版本
-- 容差判定与 cron 表达式直接绑定，配置直观
+规则:`push_cron` 中 now 离哪条 cron 最近就归为那条;最近的那条若是当天最早的 cron,则视为早报。
+
+为什么不再用单独的 `morning_cron` + 容差:
+- 复用 `push_cron`,少一个配置项,加 cron 自动延展
+- 「最近匹配」自动等价于容差 = 到次近 cron 距离的一半,systemd timer 漂移更稳健
+- 单条 cron 部署自然变成"每次推送都是早报",与用户预期一致
 
 ## 11. 与现有模块的集成点
 
@@ -686,7 +696,7 @@ def is_morning_push(now: datetime, config: Dict) -> bool:
 
 | 决策 | 方案 | 原因 |
 |---|---|---|
-| 新板块时机 | 仅早报（`schedule.morning_cron` 命中） | 板块价值更适合一日一报；晚报维持原有 RSS 节奏 |
+| 新板块时机 | 仅早报（当天最早一次 `push_cron` 触发） | 板块价值更适合一日一报；晚报维持原有 RSS 节奏；复用 push_cron 不引入新配置 |
 | 模块边界 | `src/sections/<board>/` 各自封装抓取+LLM+总结 | 模块自治便于扩展、替换、单测；上游编排极简 |
 | sentinel 归属 | push_job 上游统一包 | 模块不感知自己的板块标识；新增板块零修改成本 |
 | GH trending 数据源 | 单页 HTML `https://github.com/trending`，无语言/since 过滤 | 用户决策：最简、最稳；语言过滤靠 topics + readme 在 LLM 层判 |
@@ -696,7 +706,8 @@ def is_morning_push(now: datetime, config: Dict) -> bool:
 | GH 候选护栏 | `max_deep_dive=10` | 极端日（trending 大改）限制 HTTP 与 token 消耗 |
 | HN 数据源 | 首页 HTML + 评论/正文 Algolia | 首页要"现场感"走 HTML；Algolia 评论 JSON 结构清晰，免去 indent-tree 解析 |
 | HN 筛选策略 | 30 条 → 轻 LLM 选 K=1 → enrich → 最终 LLM 行文 | 用户决策：把 enrich 工作量压到 1 个 story；轻 LLM 用 title 已足够判 AI 相关 |
-| HN 评论数量 | `top_comments=20` | 用户决策：拿到足够素材让最终 LLM 摘要 2-3 条要点 |
+| HN 评论结构 | L1 + 每个 L1 下挂 N 条 L2 回复,tree JSON 喂 LLM | 真实数据:L2 信息量与 L1 持平(24 条/8k chars vs 18/6k);拍平丢失父子关系,LLM 无法识别"回复反驳了顶层"。Tree 结构让 LLM 看清论辩链 |
+| HN 评论上限 | `top_comments=30`(L1)+ `top_l2_per_l1=3` + `comments_total_chars=60000`(总预算) | 真实平均:L1 18 条/6k chars,L2 24 条/8k。30+3 给足余量但平均只跑 ~14k。总预算硬上限拦住离群 story(309 评论那种) |
 | 无历史上下文 | GH / HN 板块均不传 recent_section_titles | 用户决策：避免不必要的上下文污染；GH/HN 风格与 RSS digest 差异已足够大 |
 | insights 历史窗口 | 复用 `filter.push_context_days` | 不引入新字段；insights 段需要历史防风格趋同 |
 | insights 输出结构 | 由 prompt 决定，code 不强加 | 用户决策：bullet 数量与栏目属于 prompt 工程，便于迭代 |
@@ -707,3 +718,18 @@ def is_morning_push(now: datetime, config: Dict) -> bool:
 | 截断参数初始值（2026-05-17 合入） | `readme_max_chars=3000` / `top_comments=20` / `comment_max_chars=500` / `link_content_max_chars=3000` | 凭直觉给出的保守默认；上线后通过真实数据校准 |
 | 截断参数校准（2026-05-17 合入后,激进路径） | `readme_max_chars: 5000→10000` / `top_comments: 20→50` / `link_content_max_chars: 6000→50000` / `comment_max_chars: 800` 不变 / `max_prompt_chars: 64000→150000` | 用户决策:把 LLM 上下文用到 DeepSeek v4 flash 128k tokens 限的合理水平,优先内容深度而非 API 成本。Worst-case 单次 LLM prompt:GH≈110k chars / HN≈95k chars,均在 150k budget 内。中英混合 100k chars ≈ 30-50k tokens,远低于 128k 模型限 |
 | 单板块 CLI（2026-05-17 合入后） | `python -m src.main github` / `hackernews` | 便于 prompt 调优期反复跑单板块而不消耗全套 LLM 调用 |
+
+
+hacker news 评论统计
+
+┌─────────────┬──────────┬──────────────┬────────────────┬──────────┐
+│    层级     │ 平均条数 │ 平均 md 字符 │ 平均单条 chars │ 最大单条 │
+├─────────────┼──────────┼──────────────┼────────────────┼──────────┤
+│ L1 顶层评论 │ 18       │ 5,952        │ ~330           │ 1,755    │
+├─────────────┼──────────┼──────────────┼────────────────┼──────────┤
+│ L2 一级回复 │ 24       │ 8,166        │ ~340           │ 2,381    │
+├─────────────┼──────────┼──────────────┼────────────────┼──────────┤
+│ L3+ 更深层  │ 41       │ 13,048       │ ~315           │ 2,291    │
+├─────────────┼──────────┼──────────────┼────────────────┼──────────┤
+│ ALL 全部    │ 83       │ 27,166       │ ~330           │ 2,381    │
+└─────────────┴──────────┴──────────────┴────────────────┴──────────┘

@@ -22,10 +22,13 @@ async def run_hackernews_section(
 
     timeout = cfg.get("request_timeout", 10)
     select_k = cfg.get("select_k", 1)
-    top_comments = cfg.get("top_comments", 20)
-    comment_max_chars = cfg.get("comment_max_chars", 500)
-    link_content_max_chars = cfg.get("link_content_max_chars", 3000)
+    top_comments = cfg.get("top_comments", 30)
+    top_l2_per_l1 = cfg.get("top_l2_per_l1", 3)
+    comment_max_chars = cfg.get("comment_max_chars", 2000)
+    comments_total_chars = cfg.get("comments_total_chars", 60000)
+    link_content_max_chars = cfg.get("link_content_max_chars", 50000)
     algolia_base = cfg.get("algolia_base", "https://hn.algolia.com/api/v1")
+    jina_token_env = cfg.get("jinaTokenName", "JINA_API_KEY")
 
     # 1. 抓首页
     print("📥 HN: 抓取首页...")
@@ -61,10 +64,13 @@ async def run_hackernews_section(
     enriched, enrich_errors = await enrich_stories(
         selected,
         top_comments=top_comments,
+        top_l2_per_l1=top_l2_per_l1,
         comment_max_chars=comment_max_chars,
+        comments_total_chars=comments_total_chars,
         link_content_max_chars=link_content_max_chars,
         algolia_base=algolia_base,
         timeout=timeout,
+        jina_token_env=jina_token_env,
     )
     for e in enrich_errors:
         print(f"⚠️ HN enrich: {e}")

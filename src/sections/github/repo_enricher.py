@@ -18,6 +18,9 @@ def _auth_headers(token_env: str = "GITHUB_TOKEN") -> Dict[str, str]:
     token = os.environ.get(token_env)
     if token:
         headers["Authorization"] = f"Bearer {token}"
+        print(f"🔑 GH: 已配置 {token_env},鉴权调用 (5000 req/hr)")
+    else:
+        print(f"⚠️ GH: 未配置 {token_env},匿名调用 (60 req/hr)")
     return headers
 
 
