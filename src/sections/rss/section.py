@@ -3,6 +3,7 @@
 迁移自 src/main.py::run_push_job 中 RSS digest 部分,行为保持一致。
 """
 
+import traceback
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
@@ -53,8 +54,11 @@ async def run_rss_section(
             to_push, context, config["llm"], recent_push_context=recent
         )
     except Exception as e:
-        msg = f"compose_digest 失败: {e}"
+        exc_name = type(e).__name__
+        exc_msg = str(e).strip()
+        msg = f"compose_digest 失败: {exc_name}: {exc_msg}" if exc_msg else f"compose_digest 失败: {exc_name}"
         print(f"⚠️ RSS: {msg}")
+        traceback.print_exc()
         return "", None, msg
 
     date_str = (now or datetime.now()).strftime("%Y-%m-%d")

@@ -38,7 +38,9 @@ async def run_github_section(
     try:
         html = await fetch_trending_page(timeout=timeout)
     except Exception as e:
-        return "", f"GH 抓取失败: {e}"
+        exc_msg = str(e).strip()
+        msg = f"{type(e).__name__}: {exc_msg}" if exc_msg else type(e).__name__
+        return "", f"GH 抓取失败: {msg}"
 
     all_repos = parse_trending_html(html)
     print(f"📋 GH: 解析 {len(all_repos)} 个 repo")

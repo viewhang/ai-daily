@@ -35,7 +35,9 @@ async def run_hackernews_section(
     try:
         html = await fetch_frontpage(timeout=timeout)
     except Exception as e:
-        return "", f"HN 首页抓取失败: {e}"
+        exc_msg = str(e).strip()
+        msg = f"{type(e).__name__}: {exc_msg}" if exc_msg else type(e).__name__
+        return "", f"HN 首页抓取失败: {msg}"
 
     front = parse_frontpage_html(html)
     print(f"📋 HN: 解析 {len(front)} 条 frontpage stories")
