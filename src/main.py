@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import os
 import sys
+import traceback
 from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -63,7 +64,8 @@ async def notify_llm_errors(stage: str, errors: List[str], config: Dict):
     try:
         await send_to_platforms("\n".join(lines), config["push"])
     except Exception as e:
-        print(f"⚠️ LLM异常通知发送失败: {e}")
+        print(f"⚠️ LLM异常通知发送失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
 
 
 def now_local(config: Dict = None) -> datetime:
@@ -479,7 +481,8 @@ async def fetch_loop(config: Dict):
             print("⚠️ Fetch循环被外部取消，正在安全退出...")
             break  # 允许外部取消任务
         except Exception as e:
-            print(f"❌ Fetch Job 失败: {e}")
+            print(f"❌ Fetch Job 失败: {type(e).__name__}: {e}")
+            traceback.print_exc()
 
         # 计算任务耗时
         elapsed = time.monotonic() - start_time
@@ -549,7 +552,8 @@ async def push_loop(config: Dict):
             print("⚠️ Push循环收到取消信号，安全退出...")
             break  # 直接 break 退出循环即可
         except Exception as e:
-            print(f"❌ Push 循环异常: {e}")
+            print(f"❌ Push 循环异常: {type(e).__name__}: {e}")
+            traceback.print_exc()
             # 遇到未知异常时休眠 60 秒，防止死循环疯狂报错打满日志
             await asyncio.sleep(60)
 
@@ -560,7 +564,8 @@ async def cmd_check(config: Dict) -> int:
     try:
         await check_llm_available(config["llm"])
     except Exception as e:
-        print(f"❌ LLM 接口不可用: {e}")
+        print(f"❌ LLM 接口不可用: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
     print("✅ LLM 接口可用")
     return 0
@@ -572,7 +577,8 @@ async def cmd_fetch(config: Dict) -> int:
         await run_fetch_job(config)
         return 0
     except Exception as e:
-        print(f"❌ Fetch 任务失败: {e}")
+        print(f"❌ Fetch 任务失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
 
 
@@ -582,7 +588,8 @@ async def cmd_push(config: Dict) -> int:
         await run_push_job(config)
         return 0
     except Exception as e:
-        print(f"❌ Push 任务失败: {e}")
+        print(f"❌ Push 任务失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
 
 
@@ -593,7 +600,8 @@ async def cmd_loop(config: Dict) -> int:
         await check_llm_available(config["llm"])
         print("✅ LLM 接口可用")
     except Exception as e:
-        print(f"❌ LLM 接口不可用: {e}")
+        print(f"❌ LLM 接口不可用: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
     await asyncio.gather(fetch_loop(config), push_loop(config))
     return 0
@@ -605,7 +613,8 @@ async def cmd_rss(config: Dict) -> int:
     try:
         md, meta, err = await run_rss_section(config, now=now_local(config))
     except Exception as e:
-        print(f"❌ RSS 板块失败: {e}")
+        print(f"❌ RSS 板块失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
     if err:
         print(f"❌ {err}")
@@ -633,7 +642,8 @@ async def cmd_github(config: Dict) -> int:
     try:
         md, err = await run_github_section(config, now=now_local(config))
     except Exception as e:
-        print(f"❌ GitHub 板块失败: {e}")
+        print(f"❌ GitHub 板块失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
     if err:
         print(f"❌ {err}")
@@ -653,7 +663,8 @@ async def cmd_hackernews(config: Dict) -> int:
     try:
         md, err = await run_hackernews_section(config, now=now_local(config))
     except Exception as e:
-        print(f"❌ Hacker News 板块失败: {e}")
+        print(f"❌ Hacker News 板块失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
     if err:
         print(f"❌ {err}")
@@ -691,7 +702,8 @@ def main() -> int:
         config = load_config()
         print("✅ 配置加载成功")
     except Exception as e:
-        print(f"❌ 加载配置失败: {e}")
+        print(f"❌ 加载配置失败: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return 1
 
     handlers = {
