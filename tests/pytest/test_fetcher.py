@@ -1,5 +1,7 @@
 """RSS抓取模块测试"""
 
+import asyncio
+
 import pytest
 import sys
 from datetime import datetime, timezone, timedelta
@@ -13,6 +15,7 @@ from fetcher import (
     fetch_single_feed_async,
     fetch_all_feeds,
     DEFAULT_FEED_TIMEOUT,
+    _format_exc,
 )
 
 
@@ -128,6 +131,21 @@ class TestFetchSingleFeedAsync:
         assert entries == []
 
     @pytest.mark.asyncio
+    async def test_fetch_logs_exception_type_when_message_empty(self, capsys):
+        feed_info = {"title": "Test Feed", "xmlUrl": "http://test.com/rss"}
+        cutoff = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
+
+        entries = await fetch_single_feed_async(feed_info, cutoff, session=mock_session)
+
+        captured = capsys.readouterr()
+        assert entries == []
+        assert "获取失败 Test Feed" in captured.out
+        assert "TimeoutError" in captured.out
+
+    @pytest.mark.asyncio
     async def test_fetch_cutoff_filter(self):
         feed_info = {"title": "Test Feed", "xmlUrl": "http://test.com/rss"}
         cutoff = datetime(2024, 1, 10, tzinfo=timezone.utc)
@@ -188,3 +206,14 @@ class TestFetchAllFeeds:
             await mock_fetch(feed_info, cutoff, timeout=None)
 
             mock_fetch.assert_called_once()
+
+
+class TestFormatExc:
+    def test_exception_with_message(self):
+        assert _format_exc(ValueError("bad")) == "ValueError: bad"
+
+    def test_exception_with_empty_message(self):
+        assert _format_exc(ValueError("")) == "ValueError"
+
+    def test_exception_with_no_message(self):
+        assert _format_exc(RuntimeError()) == "RuntimeError"

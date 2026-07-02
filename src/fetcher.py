@@ -1,6 +1,7 @@
 """RSS抓取模块"""
 
 import asyncio
+import traceback
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -10,6 +11,11 @@ import requests
 
 # 默认超时配置（秒）
 DEFAULT_FEED_TIMEOUT = 5
+
+
+def _format_exc(exc: Exception) -> str:
+    msg = str(exc).strip()
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
 
 # title 截断阈值：nitter 会把整条推文塞进 <title>，需要截断
 TITLE_MAX_CHARS = 200
@@ -168,7 +174,8 @@ async def fetch_single_feed_async(
 
         return _parse_feed_entries(content, feed_info, cutoff_time)
     except Exception as e:
-        print(f"⚠️ 获取失败 {feed_info['title']}: {e}")
+        print(f"⚠️ 获取失败 {feed_info['title']}: {_format_exc(e)}")
+        traceback.print_exc()
         return []
 
 
@@ -206,7 +213,7 @@ async def fetch_all_feeds(
     all_entries = []
     for feed, result in zip(ordered_feeds, results):
         if isinstance(result, Exception):
-            print(f"⚠️ 获取失败 {feed['title']}: {result}")
+            print(f"⚠️ 获取失败 {feed['title']}: {_format_exc(result)}")
         else:
             all_entries.extend(result)
 
