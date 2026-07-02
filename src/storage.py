@@ -2,13 +2,12 @@
 
 import json
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import yaml
-
 from src.config import get_timezone
+from src.markdown_utils import dump_frontmatter, parse_frontmatter
 
 
 def get_fetch_file(d: date = None, data_dir: str = "news-data") -> str:
@@ -21,7 +20,7 @@ def get_fetch_file(d: date = None, data_dir: str = "news-data") -> str:
 def get_push_file(push_time: datetime = None, data_dir: str = "news-data") -> str:
     """生成push文件路径"""
     if push_time is None:
-        push_time = datetime.now()
+        push_time = datetime.now(get_timezone())
     time_str = push_time.strftime("%Y-%m-%d-%H-%M-%S")
     return f"{data_dir}/push-{time_str}.md"
 
@@ -33,30 +32,72 @@ def get_notify_file(d: date = None, data_dir: str = "news-data") -> str:
     return f"{data_dir}/notify-{d.isoformat()}.md"
 
 
-def save_notify_file(filepath: str, content: str):
+def save_notify_file(
+    filepath: str,
+    content: str,
+    metadata: Dict = None,
+):
     """保存即时推送文件（Markdown格式），同一天的内容追加到同一文件"""
     path = Path(filepath)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     notify_time = datetime.now(get_timezone()).isoformat()
 
-    new_content = f"""---
-pushTime: "{notify_time}"
----
+    if metadata:
+        frontmatter_dict = metadata.copy()
+    else:
+        frontmatter_dict = {"pushTime": notify_time}
 
-{content}
+    frontmatter = dump_frontmatter(frontmatter_dict)
 
-------
-"""
+    new_content = f"---\n{frontmatter}---\n\n{content}\n\n------\n"
 
     with open(path, "a", encoding="utf-8") as f:
         f.write(new_content)
 
 
+_SECTION_RE_CACHE: Dict[str, re.Pattern] = {}
+
+
+def _section_re(section: str) -> re.Pattern:
+    """获取/缓存 sentinel 正则。section 名做转义,允许字母数字下划线"""
+    if section not in _SECTION_RE_CACHE:
+        s = re.escape(section)
+        pattern = (
+            rf"<!--\s*SECTION:{s}\s*BEGIN\s*-->(.*?)<!--\s*SECTION:{s}\s*END\s*-->"
+        )
+        _SECTION_RE_CACHE[section] = re.compile(pattern, flags=re.DOTALL)
+    return _SECTION_RE_CACHE[section]
+
+
+def extract_section(push_md: str, section: str) -> str:
+    """从 push 文件内容中切出 <!-- SECTION:{section} BEGIN/END --> 之间的 markdown。
+
+    向后兼容:
+    - 新文件(带 sentinel): 返回 sentinel 边界内的原文(不去边界空行)
+    - 老文件(无 sentinel) 且 section == 'rss': 返回整个 push_md
+    - 老文件(无 sentinel) 且 section != 'rss': 返回空字符串
+    - sentinel 残缺(只有 BEGIN 没有 END): 返回空字符串
+    """
+    match = _section_re(section).search(push_md)
+    if match:
+        return match.group(1)
+
+    # 老文件兜底:rss 段视为整个 body
+    has_any_sentinel = "<!-- SECTION:" in push_md
+    if section == "rss" and not has_any_sentinel:
+        return push_md
+    return ""
+
+
 def load_recent_notify_content(
     context_days: int = 3, data_dir: str = "news-data"
 ) -> str:
-    """加载最近context_days天的所有notify文件内容"""
+    """加载最近 context_days 天 notify 文件正文（去除 frontmatter，仅供 LLM 查重）
+
+    notify 文件由多个推送块用 `------` 分隔，每块带各自 frontmatter；这里逐块剥离
+    frontmatter 后用 `------` 重新拼接，保留事件全文。
+    """
     data_path = Path(data_dir)
     if not data_path.exists():
         return ""
@@ -64,32 +105,44 @@ def load_recent_notify_content(
     tz = get_timezone()
     today = datetime.now(tz).date()
 
-    contents = []
+    blocks: List[str] = []
     loaded_files = []
     for i in range(context_days):
         d = today - timedelta(days=i)
         notify_file = data_path / f"notify-{d.isoformat()}.md"
-        if notify_file.exists():
-            try:
-                if notify_file.stat().st_size == 0:
-                    print(f"   ⚠️ 跳过空文件: {notify_file.name}")
-                    continue
-                with open(notify_file, "r", encoding="utf-8") as f:
-                    contents.append(f.read())
-                    loaded_files.append(notify_file.name)
-            except Exception:
+        if not notify_file.exists() or notify_file.stat().st_size == 0:
+            continue
+        try:
+            with open(notify_file, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            continue
+        for block in content.split("------"):
+            if not block.strip():
                 continue
+            _, body = parse_frontmatter(block)
+            if body:
+                blocks.append(body)
+        loaded_files.append(notify_file.name)
 
     if loaded_files:
         print(
             f"   📂 已加载 {len(loaded_files)} 个 notify 文件: {', '.join(loaded_files)}"
         )
 
-    return "\n\n".join(contents)
+    return "\n\n------\n\n".join(blocks)
 
 
-def load_recent_push_content(context_days: int = 3, data_dir: str = "news-data") -> str:
-    """加载最近context_days天的所有push文件内容"""
+def load_recent_push_content(
+    context_days: int = 3, data_dir: str = "news-data", section: str = "rss"
+) -> str:
+    """加载最近 context_days 天 push 文件中指定 section 的正文(去除 frontmatter,仅供 LLM 查重)。
+
+    Args:
+        section: sentinel 段名,默认 "rss"。老文件(无 sentinel) 且 section == "rss"
+                 时会兜底返回整个 body(由 extract_section 处理),其它 section 在
+                 老文件上返回空。
+    """
     data_path = Path(data_dir)
     if not data_path.exists():
         return ""
@@ -97,29 +150,38 @@ def load_recent_push_content(context_days: int = 3, data_dir: str = "news-data")
     tz = get_timezone()
     today = datetime.now(tz).date()
 
-    contents = []
+    bodies: List[str] = []
     loaded_files = []
     for i in range(context_days):
         d = today - timedelta(days=i)
         pattern = f"push-{d.isoformat()}-*.md"
         for push_file in sorted(data_path.glob(pattern)):
+            if push_file.stat().st_size == 0:
+                continue
             try:
-                if push_file.stat().st_size == 0:
-                    print(f"   ⚠️ 跳过空文件: {push_file.name}")
-                    continue
                 with open(push_file, "r", encoding="utf-8") as f:
                     content = f.read()
-                    contents.append(content)
-                    loaded_files.append(push_file.name)
             except Exception:
                 continue
+            section_md = extract_section(content, section)
+            if not section_md:
+                continue
+            # 老文件兜底路径会把整篇文件还回来,此时仍需剥离 frontmatter;
+            # 新文件 sentinel 内不含 frontmatter,parse_frontmatter 会原样返回。
+            _, body = parse_frontmatter(section_md)
+            body = body or section_md
+            body = body.strip()
+            if body:
+                bodies.append(body)
+                loaded_files.append(push_file.name)
 
     if loaded_files:
         print(
-            f"   📂 已加载 {len(loaded_files)} 个 push 文件: {', '.join(loaded_files)}"
+            f"   📂 已加载 {len(loaded_files)} 个 push 文件 (section={section}): "
+            f"{', '.join(loaded_files)}"
         )
 
-    return "\n\n".join(contents)
+    return "\n\n------\n\n".join(bodies)
 
 
 def get_last_push_file(data_dir: str = "news-data") -> Optional[str]:
@@ -283,22 +345,45 @@ def convert_fetch_json_to_md(json_filepath: str, md_filepath: str = None) -> str
     return md_content
 
 
-def save_push_file(filepath: str, content: str, source_count: int, total_entries: int):
-    """保存推送文件（Markdown格式）"""
+def save_push_file(
+    filepath: str,
+    content: str,
+    source_count: int,
+    total_entries: int,
+    profile: str = "default",
+    metadata: Dict = None,
+):
+    """保存推送文件（Markdown格式）
+
+    Args:
+        profile: "morning" | "default"  ← 早报或常规;写入 frontmatter,便于按 profile 分析
+        metadata: 元信息（可选），如果提供则使用 metadata，否则使用默认格式
+    """
     path = Path(filepath)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    push_time = datetime.now(get_timezone())
-    frontmatter = f"""---
-pushDate: "{push_time.isoformat()}"
-sourceCount: {source_count}
-totalEntries: {total_entries}
----
+    if metadata:
+        # 使用提供的 metadata
+        frontmatter_dict = metadata.copy()
+        # 添加推送时间和统计信息
+        frontmatter_dict["pushDate"] = datetime.now(get_timezone()).isoformat()
+        frontmatter_dict["sourceCount"] = source_count
+        frontmatter_dict["totalEntries"] = total_entries
+    else:
+        # 降级：使用默认格式
+        push_time = datetime.now(get_timezone())
+        frontmatter_dict = {
+            "profile": profile,
+            "pushDate": push_time.isoformat(),
+            "sourceCount": source_count,
+            "totalEntries": total_entries,
+        }
 
-"""
+    frontmatter = dump_frontmatter(frontmatter_dict)
+    full_content = f"---\n{frontmatter}---\n\n{content}"
 
     with open(path, "w", encoding="utf-8") as f:
-        f.write(frontmatter + content)
+        f.write(full_content)
 
 
 def load_existing_links(filepath: str, threshold: int = 150) -> set:
@@ -370,5 +455,92 @@ def cleanup_old_files(days: int = 7, data_dir: str = "news-data"):
             except (ValueError, OSError):
                 continue
 
+    # trending-history.json: 剪枝过期条目,保留文件本身
+    trending_path = data_path / "trending-history.json"
+    if trending_path.exists() and trending_path.stat().st_size > 0:
+        try:
+            history = load_trending_history(str(trending_path))
+            before = len(history.repos)
+            history.cleanup(today=datetime.now().date(), keep_days=days)
+            after = len(history.repos)
+            if after < before:
+                history.save()
+                print(f"   ✂️ trending-history 剪枝: {before} → {after} 条")
+        except Exception as e:
+            print(f"   ⚠️ trending-history 剪枝失败: {e}")
+
     if deleted_count > 0:
         print(f"   ✅ 清理完成: 删除了 {deleted_count} 个旧文件")
+
+
+class TrendingHistory:
+    """GitHub trending 已查阅 repo 索引。
+
+    repos 字段:url → last_seen_date (ISO YYYY-MM-DD)。
+    每次早报 cleanup 一次,touch 完所有今日 URL 后 save。
+    """
+
+    def __init__(self, path: str, repos: Dict[str, str]):
+        self._path = path
+        self.repos: Dict[str, str] = dict(repos)
+
+    def __contains__(self, url: str) -> bool:
+        return url in self.repos
+
+    def touch(self, url: str, today: date) -> None:
+        self.repos[url] = today.isoformat()
+
+    def cleanup(self, today: date, keep_days: int) -> None:
+        cutoff = today - timedelta(days=keep_days)
+        self.repos = {
+            url: d
+            for url, d in self.repos.items()
+            if _parse_iso_date_safe(d) is not None and _parse_iso_date_safe(d) >= cutoff
+        }
+
+    def save(self) -> None:
+        path = Path(self._path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "repos": self.repos,
+            "updated_at": datetime.now(get_timezone()).isoformat(),
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def _parse_iso_date_safe(s: str) -> Optional[date]:
+    try:
+        return date.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def load_trending_history(path: str) -> TrendingHistory:
+    """读取 trending-history.json;不存在返回空实例。"""
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return TrendingHistory(path, {})
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return TrendingHistory(path, data.get("repos", {}))
+    except (json.JSONDecodeError, OSError):
+        print(f"⚠️ trending-history 读取失败,使用空索引: {path}")
+        return TrendingHistory(path, {})
+
+
+_SECTION_ORDER = ("rss", "github", "hackernews", "insights")
+
+
+def assemble_with_sentinels(sections: Dict[str, str]) -> str:
+    """按固定顺序拼装四段 markdown,每段包 sentinel;空段整段省略。"""
+    parts: List[str] = []
+    for key in _SECTION_ORDER:
+        body = (sections.get(key) or "").strip()
+        if not body:
+            continue
+        parts.append(
+            f"<!-- SECTION:{key} BEGIN -->\n{body}\n<!-- SECTION:{key} END -->"
+        )
+    return "\n\n".join(parts)

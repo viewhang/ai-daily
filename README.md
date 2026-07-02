@@ -1,62 +1,124 @@
 
-<h1 align="center">AI Daily 每日资讯推送系统</h1>
+<h1 align="center">AI Daily</h1>
 
-![AI Daily Banner](https://cdn.yeekal.com/yee/blog/2026-03/ai-daily-cover-wide-ultra.webp)
-
-<p align="center">AI 驱动的 RSS 新闻聚合与推送系统 | 支持 400+ 信息源 | LLM 智能评分 | 推送到 Discord/飞书/钉钉</p>
+<p align="center"><i>筛选值得关注的 AI 信号</i></p>
 
 
 
-## 核心功能
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+" />
+  <img src="https://img.shields.io/badge/uv-managed-DE5FE9?style=flat-square&logo=uv&logoColor=white" alt="uv managed" />
+  <img src="https://img.shields.io/badge/RSS-400%2B%20sources-FFA500?style=flat-square&logo=rss&logoColor=white" alt="RSS 400+" />
+  <img src="https://img.shields.io/badge/deploy-systemd-orange?style=flat-square&logo=linux&logoColor=white" alt="systemd" />
+</p>
 
-- **即时推送** —— 热点新闻（≥90分）立即推送到手机
-- **定时汇总** —— 每天早 8 点、晚 5 点自动推送 AI 资讯日报
-- **400+ RSS 源** —— 聚合全球主流 AI 媒体、博客、Twitter 账号（源自 [BestBlogs](https://github.com/ginobefun/BestBlogs)）
-- **LLM 智能筛选** —— 自动评分过滤，低质量内容不推送
+[![AI Daily Banner](https://cdn.yeekal.com/yee/visuals/ai-daily-cover.webp)](https://yeekal.com/daily/)
 
-## 两大优势
-
-### 1. 即时推送 —— 避免错过重要信息
-
-当系统检测到评分极高（≥90分）的热点新闻时，会立即推送到指定平台，确保重要信息不过时。
-
-**适用场景：** 重大发布、突破性技术进展、行业重磅新闻
-
-### 2. 每日汇总 —— 把握 AI 全局近况
-
-每天定时（如早8点、晚5点）汇总近期高评分资讯，帮助用户快速了解 AI 领域整体动态。
-
-**适用场景：** 碎片化时间回顾、行业趋势把握
+<p align="center">AI 驱动的资讯聚合与推送系统｜<b>RSS · GitHub Trending · Hacker News</b> 三大板块｜LLM 智能评分｜推送到 Discord / 飞书</p>
 
 ---
+
+## 核心特性
+
+- 🗞️ **三大内容板块** —— RSS 资讯（400+ 源）+ GitHub Trending + Hacker News 热帖，从媒体、开源、社区三个维度立体捕获 AI 动态
+- 🧠 **LLM 智能筛选** —— 评分过滤 + 跨日去重，只留下值得读的
+- ⚡ **即时推送** —— 热点新闻（≥90 分）实时触达，重大发布不错过
+- 📬 **每日汇总** —— 定时早晚报，早报叠加跨板块洞察段
+- 🔌 **多平台推送** —— 飞书、Discord 开箱即用，可扩展自定义平台
+- 🛠️ **零运维部署** —— systemd timer 一键安装，开机自启、故障重启
+
+---
+
+## 三大内容板块
+
+### 📰 RSS 资讯聚合
+
+聚合全球主流 AI 媒体、博客、Twitter 账号，默认 OPML 包含约 420 个优质源（源自 [BestBlogs](https://github.com/ginobefun/BestBlogs)）。LLM 逐条评分，只保留高质量内容。
+
+- 默认 60 分钟轮询，异步并发抓取
+- 评分维度：相关度、信息密度、时效性
+- 跨日上下文去重，同一事件不重复推送
+
+### ⭐ GitHub Trending
+
+抓取 GitHub trending 页面，LLM 深读 README / topics / metadata，从昙花一现的玩具仓库里挑出真正值得关注的项目。
+
+- 从 top 10 候选中精选 3 个（可配置）
+- 输出 deep-dive 摘要，附技术亮点与上手建议
+- 历史去重索引，推过的项目不再出现
+
+### 💬 Hacker News 热帖
+
+跟踪 HN 首页 AI 相关讨论，整合**外链正文 + 顶层评论树**，产出"内容总结 + 社区观点"双段式摘要。
+
+- 轻量 LLM 从首页 30 条中选出最值得读的故事
+- 抓取 L1 顶层评论 + L2 关键回复，字符预算受控
+- 外链通过 Jina Reader 拉取 markdown 正文
+
+## 系统架构
+
+```mermaid
+flowchart TB
+    subgraph Sources["📥 数据源"]
+        RSS["RSS Feeds<br/>400+ sources"]
+        GH["GitHub Trending"]
+        HN["Hacker News<br/>Front Page"]
+    end
+
+    subgraph Fetch["⚙️ Fetch 阶段"]
+        F1["RSS Fetcher<br/>asyncio + feedparser"]
+        F2["GH Scraper<br/>README deep-dive"]
+        F3["HN Crawler<br/>Algolia + Jina Reader"]
+    end
+
+    subgraph LLMStage["🧠 LLM 评分与摘要"]
+        Score["score / score_batch"]
+        Digest["digest / immediate_push"]
+        Insight["跨板块 insights"]
+    end
+
+    subgraph Store["💾 存储"]
+        Files["news-data/<br/>fetch-*.json<br/>push-*.md"]
+    end
+
+    subgraph PushStage["📤 推送渠道"]
+        Discord["Discord Webhook"]
+        Feishu["飞书 Webhook"]
+    end
+
+    RSS --> F1 --> Score
+    GH --> F2 --> Score
+    HN --> F3 --> Score
+    Score --> Digest
+    Score --> Insight
+    Digest --> Files
+    Insight --> Files
+    Files --> Discord
+    Files --> Feishu
+```
+
+**调度说明**
+
+- `dnews-fetch.service`（默认每 60 分钟）：抓取 RSS → 评分 → 命中 ≥90 分立即推送
+- `dnews-push.service`（按 `push_cron`）：生成 digest 推送；当天最早一次额外触发 GitHub / HN / 跨板块洞察
+
 
 ## 快速开始
 
 ### 环境要求
 
-- Python 3.10+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (Python 包管理器)
+- Linux + systemd（推荐使用一键部署）
 
-### 1. 创建虚拟环境
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# 或 .venv\Scripts\activate  # Windows
-```
-
-### 2. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 配置环境变量
+### 1. 配置环境变量
 
 在项目根目录创建 `.env` 文件，添加以下配置：
 
 ```bash
 # LLM API（ OpenAI API 兼容接口）
-OPENROUTER_API_KEY=your_api_key_here
+DEEPSEEK_API_KEY=your_api_key_here
 
 # 飞书 Webhook
 FEISHU_WEBHOOK_URL=your_feishu_webhook_url_here
@@ -68,15 +130,21 @@ FEISHU_WEBHOOK_URL=your_feishu_webhook_url_here
 # DINGTALK_WEBHOOK_URL=your_dingtalk_webhook_url_here
 ```
 
-在 `config.json` 中修改 `llm` 和 `push`
+从模板拷贝一份本地配置（`config.json` 已加入 `.gitignore`，不会提交）：
+
+```bash
+cp config.json.example config.json
+```
+
+然后在 `config.json` 中修改 `llm` 和 `push`
 
 ```json
 {
     "llm": {
-        "provider": "<whatever>",
+        "provider": "<whatever>",  # openai compatiable 
         "model": "<model id>",
         "baseUrl": "<base url>",
-        "apiKeyName": "OPENROUTER_API_KEY", #your api key name in .env>
+        "apiKeyName": "DEEPSEEK_API_KEY", #your api key name in .env>
     },
     "push": {
         "feishu": {
@@ -108,10 +176,33 @@ FEISHU_WEBHOOK_URL=your_feishu_webhook_url_here
 3. 复制 Webhook URL
 
 
-### 4. 运行程序
+### 2. 一键部署（推荐）
+
+将程序作为 systemd timer 部署，由系统负责定时触发、故障重启、开机自启。
 
 ```bash
-python -m src.main
+./scripts/install.sh
+```
+
+脚本会自动同步依赖、安装 systemd 服务并按 `config.json` 中的调度配置启动定时任务，**机器重启后自动恢复**。安装成功后无需额外操作。
+
+### 3. 手动运行（可选）
+
+若不使用 systemd，也可以手动运行程序。先同步依赖（uv 会自动创建 `.venv`）：
+
+```bash
+uv sync
+```
+
+程序提供的子命令：
+
+```bash
+uv run python -m src.main check    # 校验 LLM 接口可达性（部署期使用）
+uv run python -m src.main fetch    # 单次抓取后退出（systemd timer 调用）
+uv run python -m src.main push     # 单次推送后退出（systemd timer 调用）
+uv run python -m src.main loop     # 长跑模式（本地开发/调试用）
+uv run python -m src.main github       # 单跑 GitHub Trending 板块,打印不推送
+uv run python -m src.main hackernews   # 单跑 Hacker News 板块,打印不推送
 ```
 
 首次运行会自动创建 `news-data/` 目录并开始抓取数据。
@@ -141,6 +232,67 @@ docker run -d --name ai-daily \
 - `config.json` 建议以只读挂载，便于本地修改配置后立即生效
 - `news-data` 使用数据卷持久化，避免容器重建后丢失抓取与推送记录
 - 查看日志：`docker logs -f ai-daily`
+
+---
+
+## 系统服务管理
+
+部署完成后，使用以下命令管理服务。
+
+### 常用命令
+
+安装后 `daily-news` 进入系统 PATH，可在任意目录调用：
+
+```bash
+daily-news status [N]      # 查看 timer/service 状态 + 最近 N 行日志（默认 15）
+daily-news logs            # 实时跟随日志（Ctrl+C 退出）
+daily-news start           # 启动两个 timer
+daily-news stop            # 停止两个 timer
+daily-news restart         # 重启两个 timer（仅重置调度，不立即触发任务）
+daily-news help            # 用法说明
+```
+
+手动立即触发一次任务（不影响下次调度）：
+
+```bash
+sudo systemctl start dnews-fetch.service
+sudo systemctl start dnews-push.service
+```
+
+### 修改配置后
+
+```bash
+./scripts/install.sh   # 重新跑一次即可，幂等（重新渲染单元 + restart timer）
+```
+
+修改 `config.json` 中的 `schedule`、`log.retention_days` 等需要重装；修改 `.env` 只需 `daily-news restart`。
+
+### 卸载
+
+```bash
+./scripts/uninstall.sh
+```
+
+卸载会移除 systemd 单元、`/usr/local/bin/daily-news` 和日志保留 drop-in；**不会**删除 `news-data/` 数据。
+
+### 日志保留
+
+日志通过 systemd journald 命名空间 `dnews` 隔离，保留天数由 `config.json` 中的 `log.retention_days` 控制（默认 7 天）。不影响系统其他服务的日志。
+
+### 日志查询
+
+```bash
+daily-news logs                                     # 实时跟随两个 service 的日志
+daily-news status [N]                               # 查看状态 + 最近 N 行日志（默认 15）
+
+journalctl --namespace=dnews -f                     # 实时跟随命名空间内全部日志
+journalctl --namespace=dnews -u dnews-fetch -f      # 仅跟随 fetch service
+journalctl --namespace=dnews -u dnews-push -f       # 仅跟随 push service
+journalctl --namespace=dnews --since "1 hour ago"   # 查询近 1 小时日志
+journalctl --namespace=dnews --since today          # 查询今日日志
+journalctl --namespace=dnews -p err                 # 仅查询 error 级别及以上
+journalctl --namespace=dnews --vacuum-time=1s       # 手动清空命名空间日志
+```
 
 ---
 
@@ -179,6 +331,11 @@ docker run -d --name ai-daily \
         "no_content_marker": "[NO_NEW_CONTENT]"  // LLM返回的无内容标记，用于判断是否跳过推送
     },
 
+    // 日志配置（仅对 systemd 部署生效）
+    "log": {
+        "retention_days": 7  // journald 命名空间 dnews 的日志保留天数
+    },
+
     // 调度配置
     "schedule": {
         "fetch_interval_minutes": 30,  // RSS抓取间隔（分钟）
@@ -195,7 +352,7 @@ docker run -d --name ai-daily \
 
     // LLM配置
     "llm": {
-        "provider": "openai",  // 提供商类型
+        "provider": "openai",  // 提供商类型，openai只是知名该api接口时openai接口兼容，代码中并无实际使用
         "model": "x-ai/grok-4.1-fast",  // 模型名称
         "baseUrl": "https://openrouter.ai/api/v1",  // API端点
         "apiKeyName": "OPENROUTER_API_KEY",  // 环境变量名
@@ -246,13 +403,21 @@ docker run -d --name ai-daily \
 | `push_context_days` | number | 汇总推送去重的历史push文件有效天数（默认5天） |
 | `no_content_marker` | string | LLM 返回的无内容标记，当推送内容包含此字符串时跳过推送（默认"[NO_NEW_CONTENT]"） |
 
+### log —— 日志配置
+
+仅对 `scripts/install.sh` 部署的 systemd 服务生效。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `retention_days` | number | journald 命名空间 `dnews` 的日志保留天数（默认 7 天）。修改后需要重跑 `./scripts/install.sh` |
+
 ### schedule —— 调度配置
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `fetch_interval_minutes` | number | RSS 抓取间隔，单位分钟（默认30分钟） |
 | `fetch_lookback_minutes` | number | RSS 冗余缓存时间（分钟），必须大于 `fetch_interval_minutes`，用于防止 RSS 延迟导致漏读（默认120分钟） |
-| `push_cron` | array | 定时推送的 cron 表达式数组，支持多个时间点 |
+| `push_cron` | array | 定时推送的 cron 表达式数组，支持多个时间点。**当天最早那次推送**自动作为「早报」触发 GitHub / Hacker News / 跨板块洞察三段；其余时段为默认 RSS digest。若只配置一条 cron,则每次推送都视为早报 |
 | `timezone_hours` | number | 时区偏移小时数，用于时间显示（8 = UTC+8 北京时间） |
 
 **cron 表达式说明：**
@@ -295,73 +460,34 @@ docker run -d --name ai-daily \
 | `dingtalk.enabled` | boolean | 是否启用钉钉机器人推送 |
 | `dingtalk.apiKeyName` | string | 钉钉 Webhook 的环境变量名 |
 
----
+### sections (早报扩展板块)
 
-## 实用测试脚本
+仅在当天最早一次 `push_cron` 触发时生效(即「早报」时段)。详细设计见 `docs/extra-sections-design.md`。
 
-项目提供了一套完整的测试脚本，用于验证各模块功能：
+#### sections.github_trending
+- `enabled`: 是否启用
+- `max_items`: LLM 最终选出的项目数上限(默认 3)
+- `max_deep_dive`: 单次最多 deep-dive 的候选 repo 数(默认 10)
+- `readme_max_chars`: README 截断长度(默认 10000)
+- `history_file`: trending 去重索引文件路径
+- `request_timeout`: HTTP 超时秒
+- `tokenName`: GitHub token 环境变量名;不设时匿名调用(限 60 req/hr)
 
-### 1. fetch_news.py —— RSS 抓取测试
+#### sections.hackernews
+- `enabled`: 是否启用
+- `select_k`: 轻 LLM 从首页 30 条中挑出的故事数(默认 1)
+- `top_comments`: 每个故事抓取的**顶层(L1)评论**数上限(默认 30)
+- `top_l2_per_l1`: 每条 L1 下挂的 L2 回复数上限(默认 3)
+- `comment_max_chars`: 单条评论(L1 或 L2) markdown 字符上限(默认 2000)
+- `comments_total_chars`: 整段评论树的总字符预算硬上限(默认 60000),防止离群 story 撑爆 prompt
+- `link_content_max_chars`: 外链正文截断长度(默认 50000)
+- `request_timeout`: HTTP 超时秒
+- `algolia_base`: Algolia API 基址
+- `jinaTokenName`: Jina Reader API key 环境变量名(默认 `JINA_API_KEY`);不设或对应环境变量为空时按匿名额度调用
 
-```bash
-# 获取过去 1 小时的新闻
-python tests/fetch_news.py
+#### sections.insights
+- `enabled`: 是否启用跨板块洞察段
 
-# 获取过去 30 分钟的新闻
-python tests/fetch_news.py --minutes 30
-
-# 获取过去 24 小时的新闻
-python tests/fetch_news.py --hours 24
-
-# 指定输出目录
-python tests/fetch_news.py --output-dir my-data
-```
-
-### 2. push_news.py —— 推送测试
-
-```bash
-# 默认模式：从 fetch 数据读取发送
-python tests/push_news.py
-
-# 模拟真实推送：从 news-data/push-*.md 最新文件发送
-python tests/push_news.py --real
-```
-
-### 3. test_push_loop.py —— 推送时间逻辑测试
-
-```bash
-# 测试 push 循环时间逻辑（约 90 秒）
-python tests/test_push_loop.py
-```
-
-### 4. run_llm_test.py —— LLM 综合测试
-
-```bash
-# 测试评分功能
-python tests/run_llm_test.py --score
-
-# 测试即时推送
-python tests/run_llm_test.py --immediate-push --push
-
-# 测试汇总推送
-python tests/run_llm_test.py --digest --push
-
-# 完整测试并推送
-python tests/run_llm_test.py --all --push
-```
-
-### 5. pytest 单元测试
-
-```bash
-# 运行所有测试
-pytest tests/pytest/ -v
-
-# 运行特定模块
-pytest tests/pytest/test_config.py -v
-pytest tests/pytest/test_llm.py -v
-```
-
----
 
 ## 扩展指南
 
@@ -400,113 +526,6 @@ pytest tests/pytest/test_llm.py -v
     "apiKeyName": "OPENROUTER_API_KEY"
 }
 ```
-
----
-
-## 常见问题
-
-### Q1: 如何只运行抓取而不推送？
-
-编辑 `config.json`，暂时关闭推送：
-
-```json
-"push": {
-    "discord": {
-        "enabled": false
-    }
-}
-```
-
-### Q2: LLM API 配额不足怎么办？
-
-- 降低 `fetch_interval_minutes`（如改为 60 分钟）减少调用频率
-
-### Q3: 如何查看抓取了多少条数据？
-
-查看 `news-data/fetch-YYYY-MM-DD.json` 文件，每条记录的 `score` 字段即为 LLM 评分。
-
-### Q4: 即时推送没有触发？
-
-检查：
-1. `hot_threshold` 设置是否合理（默认90分较高）
-2. 查看日志中是否有 "🔥 发现 X 条热点消息，即时推送" 输出
-
-### Q5: 定时推送没有收到？
-
-- 检查 `push_cron` 表达式是否正确
-- 确认 `timezone_hours` 与你所在时区一致
-- 查看日志中是否有 "✅ Push Job 完成" 输出
-- 检查 `push` 配置是否正确
-
-### Q6: 如何查看推送了多少条数据？
-
-查看 `news-data/push-YYYY-MM-DD.json` 文件
-
----
-
-## 数据示例
-
-### fetch-*.json 格式（原始抓取数据）
-
-```json
-{
-  "meta": { "date": "2026-03-01" },
-  "entries": [
-    {
-      "title": "Google AI 发布 Nano Banana 2 SOTA图像模型",
-      "link": "https://x.com/berryxia/status/2027777950851187020",
-      "published": "2026-02-28T23:30:05+08:00",
-      "source": "Berry(@berryxia)",
-      "content": "...",
-      "tags": ["AI", "模型"],
-      "score": 95,
-      "summary": "Google AI 发布最新图像生成模型，支持多语言文本渲染。",
-      "fetched_at": "2026-03-01T00:00:41+08:00"
-    }
-  ]
-}
-```
-
-**字段说明：**
-
-| 字段 | 说明 |
-|------|------|
-| `title` | 内容标题 |
-| `link` | 原始链接 |
-| `published` | 发布时间 |
-| `source` | 来源（Twitter 账号或博客名） |
-| `content` | Markdown 格式的正文内容 |
-| `tags` | LLM 识别的标签 |
-| `score` | LLM 评分（0-100） |
-| `summary` | LLM 生成的中文摘要 |
-| `fetched_at` | 抓取时间 |
-
-### push-*.md 格式（推送内容）
-
-```markdown
----
-pushDate: "2026-03-01T08:00:22+08:00"
-sourceCount: 24
-totalEntries: 24
----
-
-# 📰 AI资讯精选 | 2025-03-01
-
-## 🚀 模型与产品更新
-
-### [Google AI 发布 Nano Banana 2 SOTA图像模型](https://x.com/berryxia/status/...)
-Google AI 发布 Nano Banana 2，支持多语言文本渲染的顶级图像模型...
-```
-
-**字段说明：**
-
-| 字段 | 说明 |
-|------|------|
-| `pushDate` | 推送时间 |
-| `sourceCount` | 参考的来源数量 |
-| `totalEntries` | 推送的总条目数 |
-
----
 
 ## RSS 源说明
 
@@ -550,35 +569,68 @@ RSS 订阅源初始整理自 [ginobefun/BestBlogs](https://github.com/ginobefun/
 }
 ```
 
-## 目录结构
+## 常见问题 FAQ
 
+<details>
+<summary><b>LLM 调用费用大概多少？</b></summary>
+
+取决于模型选择和源数量。以 OpenRouter 的 `x-ai/grok-4.1-fast`（便宜模型）为例，日均扫描 2000+ 条 RSS + GitHub + HN，**单日成本约 ¥0.5-2 元**。可通过 `filter.min_score`、`llm.max_concurrent_batches`、`llm.max_prompt_chars` 进一步控制。
+
+</details>
+
+<details>
+<summary><b>如何只跑某一板块进行调试？</b></summary>
+
+```bash
+uv run python -m src.main github       # 只跑 GitHub Trending
+uv run python -m src.main hackernews   # 只跑 Hacker News
+uv run python -m src.main fetch        # 只跑 RSS fetch
 ```
-daily-news/
-├── src/
-│   ├── main.py          # 入口 + 双循环（抓取/推送）
-│   ├── config.py        # 配置加载 + 源合并
-│   ├── fetcher.py       # RSS 抓取
-│   ├── llm.py           # LLM 评分/汇总
-│   ├── processor.py     # HTML → Markdown
-│   ├── storage.py       # JSON 读写
-│   └── push/            # 推送平台
-│       ├── base.py      # 基类
-│       ├── discord.py
-│       └── feishu.py
-├── tests/               # 测试脚本
-│   ├── fetch_news.py
-│   ├── push_news.py
-│   ├── run_llm_test.py
-│   └── pytest/          # 单元测试
-├── config.json          # 主配置文件
-├── requirements.txt     # Python 依赖
-├── news-data/           # 数据存储
-│   ├── fetch-*.json    # 抓取的原始数据
-│   └── push-*.md      # 推送的汇总内容
-├── prompts/            # LLM 提示词
-└── resources/          # RSS 源文件
-    └── rss.opml
-```
+
+打印结果到控制台，不触发实际推送。
+
+</details>
+
+<details>
+<summary><b>抓取频率会不会被 RSS 站点封禁？</b></summary>
+
+默认 30 分钟轮询一次，远低于大多数 RSS 服务的速率限制。`fetch.max_workers` 控制并发（默认 10），对单个站点的压力可忽略。
+
+</details>
+
+<details>
+<summary><b>没配置推送渠道也能用吗？</b></summary>
+
+可以。所有推送 markdown 都会落地到 `news-data/push-*.md`，即使所有推送平台 disabled 也可手动查看。
+
+</details>
+
+<details>
+<summary><b>支持哪些 LLM 提供商？</b></summary>
+
+任何 OpenAI API 兼容接口的服务：OpenAI、DeepSeek、OpenRouter、SiliconFlow、阿里云通义千问、Groq 等。修改 `config.json` 的 `llm.baseUrl` / `llm.model` / `llm.apiKeyName` 即可切换。
+
+</details>
+
+<details>
+<summary><b>GitHub Trending / Hacker News 为什么不出现？</b></summary>
+
+它们**只在当天最早一次 `push_cron` 触发时跑**（即「早报」时段）。若 `push_cron` 只配了一条 cron，则每次推送都视为早报。详见「配置详解 → schedule」一节。
+
+</details>
+
+<details>
+<summary><b>数据存储在哪里？多久清理？</b></summary>
+
+- 抓取数据：`news-data/fetch-YYYY-MM-DD.json`
+- 推送 markdown：`news-data/push-YYYY-MM-DD-HH-MM-SS.md`
+- 通知归档：`news-data/notify-YYYY-MM-DD.md`
+
+超过 `filter.keep_days`（默认 7 天）的文件会自动清理；卸载脚本**不会**删除 `news-data/`。
+
+</details>
+
+---
 
 ## License
 

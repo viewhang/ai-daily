@@ -121,7 +121,9 @@ async def test_push(mode: str = "fake"):
     # 推送到所有已启用平台
     print("\n📤 推送消息...")
     try:
-        await send_to_platforms(content, config["push"])
+        await send_to_platforms(
+            content, config["push"], "📰 AI Daily 每日精选 | {Test:YYYY-MM-DD}"
+        )
     except Exception as e:
         print(f"   ❌ 推送失败: {e}")
         raise

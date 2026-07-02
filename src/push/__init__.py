@@ -6,6 +6,7 @@ from .base import PushPlatform
 from .dingtalk import DingTalkPlatform
 from .discord import DiscordPlatform
 from .feishu import FeishuPlatform
+from .custom import CustomPlatform
 
 
 def create_platform(name: str, config: Dict) -> Optional[PushPlatform]:
@@ -14,6 +15,7 @@ def create_platform(name: str, config: Dict) -> Optional[PushPlatform]:
         "discord": DiscordPlatform,
         "feishu": FeishuPlatform,
         "dingtalk": DingTalkPlatform,
+        "custom": CustomPlatform,
     }
 
     if name not in platforms:
@@ -28,9 +30,7 @@ def create_platform(name: str, config: Dict) -> Optional[PushPlatform]:
     return platform
 
 
-async def send_to_platforms(
-    content: str, push_config: Dict, title: Optional[str] = None
-):
+async def send_to_platforms(content: str, push_config: Dict, title: str = None, metadata: Optional[Dict] = None):
     """发送内容到所有已启用且配置有效的平台"""
     for platform_name, platform_conf in push_config.items():
         platform = create_platform(platform_name, platform_conf)
@@ -38,7 +38,7 @@ async def send_to_platforms(
             continue
 
         try:
-            await platform.send(content, title)
+            await platform.send(content, title, metadata)
             print(f"✅ 已推送到 {platform_name}")
         except Exception as e:
             print(f"❌ 推送到 {platform_name} 失败: {e}")

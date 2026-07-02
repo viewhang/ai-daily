@@ -24,8 +24,8 @@ class FeishuPlatform(PushPlatform):
         webhook = os.environ.get(api_key_name, "")
         return bool(webhook)
 
-    async def send(self, content: str, title: Optional[str] = None):
-        """发送到飞书"""
+    async def send(self, content: str, title: str = None, metadata: Dict = None):
+        """发送到飞书（忽略 metadata）"""
         chunks = self._split_content(content, limit=8000)
 
         async with aiohttp.ClientSession() as session:

@@ -15,6 +15,12 @@ class PushPlatform(ABC):
         pass
 
     @abstractmethod
-    async def send(self, content: str, title: Optional[str] = None):
-        """发送内容"""
+    async def send(self, content: str, title: str = None, metadata: Dict = None):
+        """发送内容
+
+        Args:
+            content: 正文内容
+            title: 标题（可选，兼容旧接口）
+            metadata: 元信息（可选，新增参数）
+        """
         pass

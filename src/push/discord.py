@@ -24,9 +24,10 @@ class DiscordPlatform(PushPlatform):
         webhook = os.environ.get(api_key_name, "")
         return bool(webhook and webhook.startswith("https://discord.com/api/webhooks/"))
 
-    async def send(self, content: str, title: Optional[str] = None):
-        """发送到Discord"""
-        chunks = self._split_content(content, limit=2000)
+    async def send(self, content: str, title: str = None, metadata: Dict = None):
+        """发送到Discord（忽略 metadata）"""
+        full_content = f"# {title}\n\n{content}" if title else content
+        chunks = self._split_content(full_content, limit=2000)
 
         async with aiohttp.ClientSession() as session:
             for chunk in chunks:
