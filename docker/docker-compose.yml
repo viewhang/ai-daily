@@ -1,0 +1,9 @@
+services:
+  ai-daily:
+    image: ai-daily:latest
+    container_name: ai-daily
+    restart: always
+    env_file: .env
+    volumes:
+      - /Users/ethan/Documents/workspace/other/ai-daily/docker/config.json:/app/config.json:ro
+      - /Users/ethan/Documents/workspace/other/ai-daily/docker/news-data:/app/news-data

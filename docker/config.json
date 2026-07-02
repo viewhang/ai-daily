@@ -20,7 +20,7 @@
   "llm": {
     "provider": "openai",
     "model": "Qwen3.5-27B",
-    "baseUrl": "http://221.181.215.170:8890/v1",
+    "baseUrl": "http://172.28.30.253/v1",
     "apiKeyName": "OPENROUTER_API_KEY",
     "max_prompt_chars": 118000,
     "max_concurrent_batches": 3,
