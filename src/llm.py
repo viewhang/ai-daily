@@ -441,6 +441,9 @@ async def compose_digest(
 
     entries_for_llm = []
     for e in entries:
+        summary = e.get("summary", "")
+        content = e.get("content", "")
+        body = summary if summary else (content[:2000] if content else "")
         entries_for_llm.append(
             {
                 "title": e.get("title", ""),
@@ -449,7 +452,7 @@ async def compose_digest(
                 "published": e.get("published", ""),
                 "tags": e.get("tags", []),
                 "score": e.get("score", 0),
-                "summary": e.get("summary", ""),
+                "summary": body,
             }
         )
 
