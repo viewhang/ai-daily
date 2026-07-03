@@ -30,7 +30,7 @@ class DingTalkPlatform(PushPlatform):
             )
         )
 
-    async def send(self, content: str, title: Optional[str] = None):
+    async def send(self, content: str, title: Optional[str] = None, metadata: Dict = None):
         """发送到钉钉"""
         chunks = self._split_content(content, limit=4000)
 

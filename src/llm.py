@@ -437,6 +437,31 @@ async def compose_digest(
     """
     prompt_path = config.get("prompts", {}).get("digest", "prompts/digest.md")
 
+    max_prompt_chars = config.get("max_prompt_chars", 100000)
+
+    entries_for_llm = []
+    for e in entries:
+        entries_for_llm.append(
+            {
+                "title": e.get("title", ""),
+                "link": e.get("link", ""),
+                "source": e.get("source", ""),
+                "published": e.get("published", ""),
+                "tags": e.get("tags", []),
+                "score": e.get("score", 0),
+                "summary": e.get("summary", ""),
+            }
+        )
+
+    # 按 score 降序，截断到 max_prompt_chars 以内
+    entries_for_llm.sort(key=lambda x: x.get("score", 0), reverse=True)
+    entries_json = json.dumps(entries_for_llm, ensure_ascii=False, indent=2)
+    while len(entries_json) > max_prompt_chars and len(entries_for_llm) > 1:
+        entries_for_llm.pop()
+        entries_json = json.dumps(entries_for_llm, ensure_ascii=False, indent=2)
+    if len(entries_for_llm) < len(entries):
+        print(f"✂️ compose_digest: 条目从 {len(entries)} 截断到 {len(entries_for_llm)} (max_prompt_chars={max_prompt_chars})")
+
     # context 只保留必要字段，拼接成字符串
     context_text = []
     for c in context:
@@ -451,8 +476,8 @@ async def compose_digest(
 
     prompt = load_prompt(
         prompt_path,
-        count=len(entries),
-        entries=json.dumps(entries, ensure_ascii=False, indent=2),
+        count=len(entries_for_llm),
+        entries=entries_json,
         context="\n\n".join(context_text),
         recent_push_context=recent_push_context,
         date=datetime.now().strftime("%Y-%m-%d"),
