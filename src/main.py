@@ -48,24 +48,12 @@ from src.storage import (
 
 
 async def notify_llm_errors(stage: str, errors: List[str], config: Dict):
-    """发送简单的 LLM 异常通知"""
+    """LLM 异常只记录日志，不推送"""
     if not errors:
         return
 
-    lines = [
-        "## LLM异常",
-        "",
-        f"stage: {stage}",
-        f"time: {now_local(config).strftime('%Y-%m-%d %H:%M:%S')}",
-        "",
-    ]
-    lines.extend(f"- {error}" for error in errors)
-
-    try:
-        await send_to_platforms("\n".join(lines), config["push"])
-    except Exception as e:
-        print(f"⚠️ LLM异常通知发送失败: {type(e).__name__}: {e}")
-        traceback.print_exc()
+    for error in errors:
+        print(f"⚠️ [LLM异常] stage={stage}: {error}")
 
 
 def now_local(config: Dict = None) -> datetime:
