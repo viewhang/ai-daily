@@ -269,7 +269,7 @@ def _reconcile_batch_results(
     errors = []
     if len(results) != len(entries) or len(matched_results) != len(entries):
         missing_links = sorted(entry_links - result_links)
-        error_message = (
+        warning_message = (
             "批次{batch} 评分结果异常: 输入{input_count}, 返回{output_count}, "
             "匹配{matched_count}, 未评分链接({missing_count}): {missing}"
         ).format(
@@ -280,8 +280,9 @@ def _reconcile_batch_results(
             missing_count=len(missing_links),
             missing=missing_links,
         )
-        print(f"⚠️ {error_message}")
-        errors.append(error_message)
+        print(f"⚠️ {warning_message}")
+        if len(matched_results) == 0:
+            errors.append(warning_message)
 
     return matched_results, errors
 

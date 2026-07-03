@@ -302,11 +302,7 @@ class TestScoreBatch:
 
         assert len(results) == 1
         assert results[0]["score"] == 91
-        assert len(errors) == 1
-        assert "评分结果异常" in errors[0]
-        assert "输入2" in errors[0]
-        assert "返回1" in errors[0]
-        assert "匹配1" in errors[0]
+        assert len(errors) == 0
 
     @pytest.mark.asyncio
     async def test_score_single_batch_keeps_full_results(self, sample_entries, sample_config):
